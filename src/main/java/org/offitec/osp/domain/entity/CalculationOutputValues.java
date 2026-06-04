@@ -1,22 +1,41 @@
 package org.offitec.osp.domain.entity;
 
 import jakarta.persistence.*;
+import lombok.*;
 
 @Entity
 @Table(name = "calc_output_vals")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class CalculationOutputValues {
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "calc_output_vals_seq_gen")
     @SequenceGenerator(name = "calc_output_vals_seq_gen", sequenceName = "osp_calc_output_vals_sequence", allocationSize = 50)
-    private Long Id;
+    private Long id;
 
+    @Column(name = "refrigerant_capacity")
     private double refrigerantCapacity;
+
+    @Column(name = "evaporator_capacity")
     private double evaporatorCapacity;
+
+    @Column(name = "power_input")
     private double powerInput;
+
+    @Column(name = "condenser_capacity")
     private double condenserCapacity;
+
     private double current;
-    private double cop_eer;
+
+    @Column(name = "cop_eer")
+    private double copEer;
+
+    @Column(name = "mass_flow")
     private double massFlow;
+
+    @Column(name = "operating_frequency")
     private double operatingFrequency;
 }

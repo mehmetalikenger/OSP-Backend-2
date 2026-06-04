@@ -1,8 +1,14 @@
 package org.offitec.osp.domain.entity;
 
 import jakarta.persistence.*;
+import lombok.*;
 
 @Entity
+@Table(name = "refrigerant")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class Refrigerant {
 
     @Id
@@ -13,6 +19,6 @@ public class Refrigerant {
     @Column(nullable = false)
     private String name;
 
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true)
     private String code;
 }

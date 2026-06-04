@@ -1,8 +1,14 @@
 package org.offitec.osp.domain.entity;
 
 import jakarta.persistence.*;
+import lombok.*;
 
 @Entity
+@Table(name = "chassis")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class Chassis {
 
     @Id

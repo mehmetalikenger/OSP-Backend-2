@@ -1,8 +1,23 @@
 package org.offitec.osp.domain.entity;
 
 import jakarta.persistence.*;
+import lombok.*;
+import org.offitec.osp.domain.enums.UnitCategory;
+import org.offitec.osp.domain.enums.UnitTypeEnum;
+
+import java.util.List;
 
 @Entity
+@Table(
+    name = "product",
+    uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"brand", "series", "model"})
+    }
+)
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class Product {
 
     @Id
@@ -16,15 +31,14 @@ public class Product {
     @Column(nullable = false)
     private String model;
 
-    @JoinColumn(name = "category_id", nullable = false)
-    @ManyToOne(fetch = FetchType.LAZY)
-    private Category category;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "category", nullable = false)
+    private UnitCategory category;
 
-    @JoinColumn(name = "type_id", nullable = false)
-    @ManyToOne(fetch = FetchType.LAZY)
-    private UnitType unitType;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "unit_type", nullable = false)
+    private UnitTypeEnum unitType;
 
-    @JoinColumn(name = "product_details_id")
-    @OneToMany(fetch = FetchType.LAZY)
-    private ProductDetails productDetails;
+    @OneToMany(mappedBy = "product", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ProductDetails> productDetails;
 }

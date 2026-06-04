@@ -1,8 +1,15 @@
 package org.offitec.osp.domain.entity;
 
 import jakarta.persistence.*;
+import lombok.*;
+import org.offitec.osp.domain.enums.CompressorKind;
 
 @Entity
+@Table(name = "compressor")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class Compressor {
 
     @Id
@@ -10,9 +17,9 @@ public class Compressor {
     @SequenceGenerator(name = "compressor_seq_gen", sequenceName = "osp_compressor_sequence", allocationSize = 50)
     private Long id;
 
-    @JoinColumn(name = "compressor_type_id", nullable = false)
-    @ManyToOne(fetch = FetchType.LAZY)
-    private CompressorType type;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type", nullable = false)
+    private CompressorKind type;
 
     @Column(nullable = false)
     private String brand;
