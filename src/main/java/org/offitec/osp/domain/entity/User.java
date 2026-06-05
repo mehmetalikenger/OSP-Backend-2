@@ -2,24 +2,22 @@ package org.offitec.osp.domain.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 import org.offitec.osp.domain.enums.UserRole;
 
 @Entity
-@Table(name = "user")
+@Table(name = "users")
 @Inheritance(strategy = InheritanceType.JOINED)
 @Getter
 @Setter
 @NoArgsConstructor
-@AllArgsConstructor
+@SuperBuilder
 public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "user_seq_gen")
     @SequenceGenerator(name = "user_seq_gen", sequenceName = "osp_user_sequence", allocationSize = 50)
     private Long id;
-
-    @Column(nullable = false)
-    private String firstName;
 
     @Column(nullable = false)
     private String username;
@@ -30,19 +28,18 @@ public class User {
     @Column(nullable = false)
     private String password;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private UserRole role = UserRole.USER;
 
-    @Column(nullable = false)
+    private String address;
+
     private String country;
 
-    @Column(nullable = false)
     private String city;
 
-    @Column(nullable = false)
     private String phone;
 
-    @Column(nullable = false)
     private String imageUrl;
 }
