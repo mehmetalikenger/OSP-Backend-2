@@ -37,22 +37,23 @@ public class JwtService implements TokenGeneratorPort {
     }
 
     @Override
-    public String generateAccessToken(String email) {
-        return  generateToken(email, false, Integer.parseInt(accessTokenExpTime));
+    public String generateAccessToken(String email, String role) {
+        return  generateToken(email, role, false, Integer.parseInt(accessTokenExpTime));
     }
 
     @Override
-    public String generateRefreshToken(String email, Boolean rememberMe) {
-        return generateToken(email, rememberMe, Integer.parseInt(refreshTokenExpTime));
+    public String generateRefreshToken(String email, String role, Boolean rememberMe) {
+        return generateToken(email, role, rememberMe, Integer.parseInt(refreshTokenExpTime));
     }
 
-    public String generateToken(String email, Boolean rememberMe, int expSeconds){
+    public String generateToken(String email, String role, Boolean rememberMe, int expSeconds){
 
         Instant now = Instant.now();
 
         return Jwts
                 .builder()
                 .subject(email)
+                .claim("role", role)
                 .claim("rememberMe", rememberMe)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusSeconds(expSeconds)))

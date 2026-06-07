@@ -24,7 +24,7 @@ public class AdminRegisterAppService {
 
     public void UserRegister(UserRegisterDTO dto){
 
-        UserRegisterData data = new UserRegisterData(dto.getEmail());
+        UserRegisterData data = new UserRegisterData(dto.getEmail(), dto.getCategory());
         userRegisterService.UserRegister(data);
     }
 }

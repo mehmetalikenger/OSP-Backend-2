@@ -1,4 +1,6 @@
 package org.offitec.osp.domain.data;
 
-public record UserRegisterData(String email) {
+import org.offitec.osp.domain.enums.UserCategory;
+
+public record UserRegisterData(String email, UserCategory category) {
 }

@@ -7,7 +7,7 @@ import org.passay.PasswordGenerator;
 import org.springframework.stereotype.Component;
 
 @Component
-public class TemporaryPasswordGeneratorPortImpl implements TemporaryPasswordGeneratorPort {
+public class TemporaryPasswordGeneratorImpl implements TemporaryPasswordGeneratorPort {
 
     public String generate(){
 

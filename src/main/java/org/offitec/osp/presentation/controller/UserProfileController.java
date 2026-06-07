@@ -53,4 +53,10 @@ public class UserProfileController {
 
         return HttpStatus.OK;
     }
+
+    @org.springframework.web.bind.annotation.GetMapping("/{id}")
+    public org.springframework.http.ResponseEntity<org.offitec.osp.presentation.dto.UserProfileDTO> getUserProfile(@org.springframework.web.bind.annotation.PathVariable Long id) {
+        org.offitec.osp.presentation.dto.UserProfileDTO profile = userProfileAppService.getUserProfile(id);
+        return org.springframework.http.ResponseEntity.ok(profile);
+    }
 }

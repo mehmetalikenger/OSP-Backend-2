@@ -45,4 +45,46 @@ public class UserProfileAppService {
         UserPasswordData data = new UserPasswordData(dto.getId(), dto.getPassword());
         userProfileService.updateUserPassword(data);
     }
+
+    public org.offitec.osp.presentation.dto.UserProfileDTO getUserProfile(Long id) {
+        org.offitec.osp.domain.entity.User user = userProfileService.getUserProfile(id);
+        return mapToDTO(user);
+    }
+
+    public java.util.List<org.offitec.osp.presentation.dto.UserProfileDTO> getAllUsers() {
+        return userProfileService.getAllUsersByRole(org.offitec.osp.domain.enums.UserRole.USER)
+                .stream().map(this::mapToDTO).toList();
+    }
+
+    public java.util.List<org.offitec.osp.presentation.dto.UserProfileDTO> getAllAdmins() {
+        return userProfileService.getAllUsersByRole(org.offitec.osp.domain.enums.UserRole.ADMIN)
+                .stream().map(this::mapToDTO).toList();
+    }
+
+    public void deleteUser(Long id) {
+        userProfileService.deleteUser(id);
+    }
+
+    public void updateUserCategory(Long id, org.offitec.osp.domain.enums.UserCategory category) {
+        userProfileService.updateUserCategory(id, category);
+    }
+
+    private org.offitec.osp.presentation.dto.UserProfileDTO mapToDTO(org.offitec.osp.domain.entity.User user) {
+        String surname = null;
+        if (user instanceof org.offitec.osp.domain.entity.Admin admin) {
+            surname = admin.getSurname();
+        }
+        return new org.offitec.osp.presentation.dto.UserProfileDTO(
+            user.getId(),
+            user.getUsername(),
+            user.getEmail(),
+            user.getPhone(),
+            user.getAddress(),
+            user.getCountry(),
+            user.getCity(),
+            surname,
+            user.getCategory(),
+            user.getCreatedAt()
+        );
+    }
 }

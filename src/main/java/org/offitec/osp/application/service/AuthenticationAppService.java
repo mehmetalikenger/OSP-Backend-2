@@ -18,9 +18,7 @@ public class AuthenticationAppService {
 
     public UserAuthResponseDTO authenticate(UserAuthDTO dto){
 
-        boolean shouldRemember = Boolean.TRUE.equals(dto.getRememberMe());
-
-        UserAuthData authData = new UserAuthData(dto.getEmail(), dto.getPassword(), shouldRemember);
+        UserAuthData authData = new UserAuthData(dto.getEmail(), dto.getPassword(), dto.isRememberMe());
 
         UserAuthResponseData authResponseData = authenticationService.authenticate(authData);
 

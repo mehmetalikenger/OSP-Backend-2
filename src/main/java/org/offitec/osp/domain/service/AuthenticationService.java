@@ -35,13 +35,13 @@ public class AuthenticationService {
             throw new UserNotFoundException("User not found.");
         }
 
-        if(passwordEncoderPort.matches(data.password(), dbUser.get().getPassword())){
+        if(!passwordEncoderPort.matches(data.password(), dbUser.get().getPassword())){
 
             throw new PasswordsDontMatchException("Passwords don't match.");
         }
 
-        String accessToken = tokenGeneratorPort.generateAccessToken(dbUser.get().getEmail());
-        String refreshToken = tokenGeneratorPort.generateRefreshToken(dbUser.get().getEmail(), data.rememberMe());
+        String accessToken = tokenGeneratorPort.generateAccessToken(dbUser.get().getEmail(), dbUser.get().getRole().toString());
+        String refreshToken = tokenGeneratorPort.generateRefreshToken(dbUser.get().getEmail(), dbUser.get().getRole().toString(), data.rememberMe());
 
       return new UserAuthResponseData(dbUser.get().getId(), dbUser.get().getRole().toString(), accessToken, refreshToken);
     }

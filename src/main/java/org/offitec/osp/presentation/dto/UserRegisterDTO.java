@@ -11,4 +11,6 @@ public class UserRegisterDTO {
     @NotBlank(message = "Email can't be blank.")
     @Email
     private String email;
+
+    private org.offitec.osp.domain.enums.UserCategory category;
 }

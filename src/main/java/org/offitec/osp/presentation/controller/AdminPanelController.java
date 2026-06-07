@@ -17,8 +17,11 @@ public class AdminPanelController {
 
     private final AdminRegisterAppService adminRegisterAppService;
 
-    public AdminPanelController(AdminRegisterAppService adminRegisterAppService){
+    private final org.offitec.osp.application.service.AdminPanelAppService adminPanelAppService;
+
+    public AdminPanelController(AdminRegisterAppService adminRegisterAppService, org.offitec.osp.application.service.AdminPanelAppService adminPanelAppService){
         this.adminRegisterAppService = adminRegisterAppService;
+        this.adminPanelAppService = adminPanelAppService;
     }
 
     @PostMapping("/user-register")
@@ -37,4 +40,27 @@ public class AdminPanelController {
         return HttpStatus.OK;
     }
 
+    @org.springframework.web.bind.annotation.GetMapping("/users")
+    public org.springframework.http.ResponseEntity<java.util.List<org.offitec.osp.presentation.dto.UserProfileDTO>> getAllUsers() {
+        return org.springframework.http.ResponseEntity.ok(adminPanelAppService.getAllUsers());
+    }
+
+    @org.springframework.web.bind.annotation.GetMapping("/admins")
+    public org.springframework.http.ResponseEntity<java.util.List<org.offitec.osp.presentation.dto.UserProfileDTO>> getAllAdmins() {
+        return org.springframework.http.ResponseEntity.ok(adminPanelAppService.getAllAdmins());
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/user/{id}")
+    public HttpStatus deleteUser(@org.springframework.web.bind.annotation.PathVariable Long id) {
+        adminPanelAppService.deleteUser(id);
+        return HttpStatus.OK;
+    }
+
+    @PostMapping("/update-category")
+    public HttpStatus updateCategory(@RequestBody java.util.Map<String, String> payload) {
+        Long userId = Long.valueOf(payload.get("userId"));
+        org.offitec.osp.domain.enums.UserCategory category = org.offitec.osp.domain.enums.UserCategory.valueOf(payload.get("category"));
+        adminPanelAppService.updateUserCategory(userId, category);
+        return HttpStatus.OK;
+    }
 }

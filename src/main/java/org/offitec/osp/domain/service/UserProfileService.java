@@ -91,4 +91,30 @@ public class UserProfileService {
         user.setPassword(hashedPassword);
         userRepositoryPort.save(user);
     }
+
+    public User getUserProfile(Long id) {
+        Optional<User> dbUser = userRepositoryPort.findById(id);
+        if(dbUser.isEmpty()){
+            throw new RuntimeException("User not found");
+        }
+        return dbUser.get();
+    }
+
+    public java.util.List<User> getAllUsersByRole(org.offitec.osp.domain.enums.UserRole role) {
+        return userRepositoryPort.findAllByRole(role);
+    }
+
+    public void deleteUser(Long id) {
+        userRepositoryPort.deleteById(id);
+    }
+
+    public void updateUserCategory(Long id, org.offitec.osp.domain.enums.UserCategory category) {
+        Optional<User> dbUser = userRepositoryPort.findById(id);
+        if(dbUser.isEmpty()){
+            throw new RuntimeException("User not found");
+        }
+        User user = dbUser.get();
+        user.setCategory(category);
+        userRepositoryPort.save(user);
+    }
 }

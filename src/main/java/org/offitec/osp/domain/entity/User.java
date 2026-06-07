@@ -42,4 +42,13 @@ public class User {
     private String phone;
 
     private String imageUrl;
+
+    @org.hibernate.annotations.CreationTimestamp
+    @Column(updatable = false)
+    private java.time.LocalDateTime createdAt;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private org.offitec.osp.domain.enums.UserCategory category = org.offitec.osp.domain.enums.UserCategory.A;
 }

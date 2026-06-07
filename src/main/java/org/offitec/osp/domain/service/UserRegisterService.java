@@ -47,6 +47,7 @@ public class UserRegisterService {
                 .username(data.email().split("@")[0])
                 .email(data.email())
                 .password(hashedPassword)
+                .category(data.category() != null ? data.category() : org.offitec.osp.domain.enums.UserCategory.A)
                 .build();
 
         userRepositoryPort.save(user);
