@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 @Getter
+@Setter
 public class AdminUpdateDTO extends UserUpdateDTO {
 
     @NotBlank(message = "Surname can't be blank.")

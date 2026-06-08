@@ -8,9 +8,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.offitec.osp.domain.data.UserAuthResponseData;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+
 
 @RestController
 public class AuthenticationController {
@@ -44,7 +50,6 @@ public class AuthenticationController {
                 .secure(true)
                 .sameSite(sameSite)
                 .path("/")
-                .maxAge(accessTokenMaxAge)
                 .build();
 
         ResponseCookie.ResponseCookieBuilder refreshCookieBuilder = ResponseCookie.from("refreshToken", responseDTO.getRefreshToken())
@@ -59,7 +64,6 @@ public class AuthenticationController {
 
         ResponseCookie refreshCookie = refreshCookieBuilder.build();
         
-        // Null out tokens in body to avoid exposing them since we set them in HttpOnly cookies
         responseDTO.setAccessToken(null);
         responseDTO.setRefreshToken(null);
 
@@ -86,6 +90,41 @@ public class AuthenticationController {
                 .path("/")
                 .maxAge(0)
                 .build();
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, accessCookie.toString())
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+                .build();
+    }
+
+    @GetMapping("/newAccessToken")
+    public ResponseEntity<Void> newAccessToken(){
+
+        UserAuthResponseData authResponseData = authenticationAppService.generateAccessToken();
+
+        ResponseCookie accessCookie = ResponseCookie.from("accessToken", authResponseData.accessToken())
+                .httpOnly(true)
+                .secure(true)
+                .sameSite(sameSite)
+                .path("/")
+                .build();
+
+        ResponseCookie.ResponseCookieBuilder refreshCookieBuilder = ResponseCookie.from("refreshToken", authResponseData.refreshToken())
+                .httpOnly(true)
+                .secure(true)
+                .sameSite(sameSite)
+                .path("/");
+
+        SecurityContext context = SecurityContextHolder.getContext();
+        Authentication authentication = context.getAuthentication();
+        boolean rememberMe = (boolean) authentication.getCredentials();
+
+        if(rememberMe){
+
+            refreshCookieBuilder.maxAge(refreshTokenMaxAge);
+        }
+
+        ResponseCookie refreshCookie = refreshCookieBuilder.build();
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, accessCookie.toString())

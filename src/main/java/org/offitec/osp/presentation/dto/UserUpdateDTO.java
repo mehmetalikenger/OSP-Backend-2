@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 @Getter
+@Setter
 public class UserUpdateDTO {
 
     @NotNull(message = "ID can't be blank.")

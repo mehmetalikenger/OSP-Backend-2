@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 @Getter
+@Setter
 public class UserPasswordDTO {
 
     @NotNull(message = "ID can't be blank.")

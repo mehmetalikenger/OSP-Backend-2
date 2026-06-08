@@ -29,6 +29,9 @@ public class UserProfileAppService {
     //For admin specific attributes
     public void updateAdmin(AdminUpdateDTO dto){
 
+        UserUpdateData userData = new UserUpdateData(dto.getId(), dto.getUsername(), dto.getEmail(), dto.getPhone());
+        userProfileService.updateUser(userData);
+
         AdminUpdateData data = new AdminUpdateData(dto.getId(), dto.getSurname());
         userProfileService.updateAdmin(data);
     }

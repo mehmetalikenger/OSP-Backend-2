@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.offitec.osp.domain.enums.UserRole;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "users")
@@ -12,6 +14,8 @@ import org.offitec.osp.domain.enums.UserRole;
 @Setter
 @NoArgsConstructor
 @SuperBuilder
+@SQLDelete(sql = "UPDATE users SET is_deleted = true WHERE id=?")
+@SQLRestriction("is_deleted = false")
 public class User {
 
     @Id
@@ -51,4 +55,8 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private org.offitec.osp.domain.enums.UserCategory category = org.offitec.osp.domain.enums.UserCategory.A;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean isDeleted = false;
 }

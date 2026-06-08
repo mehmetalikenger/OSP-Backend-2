@@ -105,6 +105,13 @@ public class UserProfileService {
     }
 
     public void deleteUser(Long id) {
+        Optional<User> dbUser = userRepositoryPort.findById(id);
+        if(dbUser.isPresent()){
+            User user = dbUser.get();
+            // Free up the email so a new user can register with it
+            user.setEmail(user.getEmail() + "_DELETED_" + java.util.UUID.randomUUID().toString());
+            userRepositoryPort.save(user);
+        }
         userRepositoryPort.deleteById(id);
     }
 
