@@ -11,4 +11,5 @@ public class UserAuthResponseDTO {
     private String role;
     private String accessToken;
     private String refreshToken;
+    private boolean reactivated;
 }

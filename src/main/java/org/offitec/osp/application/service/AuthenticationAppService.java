@@ -34,6 +34,7 @@ public class AuthenticationAppService {
         responseDTO.setRole(authResponseData.role());
         responseDTO.setAccessToken(authResponseData.accessToken());
         responseDTO.setRefreshToken(authResponseData.refreshToken());
+        responseDTO.setReactivated(authResponseData.reactivated());
 
         return responseDTO;
     }
@@ -49,6 +50,6 @@ public class AuthenticationAppService {
         String role = authentication.getAuthorities().isEmpty() ? null : authentication.getAuthorities().iterator().next().getAuthority();
 
         return new UserAuthResponseData(null, role, tokenGeneratorPort.generateAccessToken(email, role),
-                tokenGeneratorPort.generateRefreshToken(email, role, rememberMe));
+                tokenGeneratorPort.generateRefreshToken(email, role, rememberMe), false);
     }
 }

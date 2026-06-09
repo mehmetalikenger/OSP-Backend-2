@@ -36,7 +36,17 @@ public class UserRegisterService {
         Optional<User> dbUser =  userRepositoryPort.findByEmail(data.email());
 
         if(dbUser.isPresent()){
-
+            if (dbUser.get().getDeletedAt() != null) {
+                User user = dbUser.get();
+                user.setDeletedAt(null);
+                user.setDeletedBy(null);
+                String rawPassword = temporaryPasswordGeneratorPort.generate();
+                String hashedPassword = passwordEncoderPort.encode(rawPassword);
+                user.setPassword(hashedPassword);
+                user.setCategory(data.category() != null ? data.category() : org.offitec.osp.domain.enums.UserCategory.A);
+                userRepositoryPort.save(user);
+                return;
+            }
             throw new AdminAlreadyExistsException("This user already exists.");
         }
 
@@ -58,7 +68,16 @@ public class UserRegisterService {
         Optional<Admin> dbAdmin =  adminRepositoryPort.findByEmail(data.email());
 
         if(dbAdmin.isPresent()){
-
+            if (dbAdmin.get().getDeletedAt() != null) {
+                Admin admin = dbAdmin.get();
+                admin.setDeletedAt(null);
+                admin.setDeletedBy(null);
+                String rawPassword = temporaryPasswordGeneratorPort.generate();
+                String hashedPassword = passwordEncoderPort.encode(rawPassword);
+                admin.setPassword(hashedPassword);
+                adminRepositoryPort.save(admin);
+                return;
+            }
             throw new AdminAlreadyExistsException("This admin already exists.");
         }
 

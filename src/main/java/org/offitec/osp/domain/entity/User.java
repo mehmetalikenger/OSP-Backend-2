@@ -3,9 +3,13 @@ package org.offitec.osp.domain.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import org.hibernate.annotations.CreationTimestamp;
+import org.offitec.osp.domain.enums.UserCategory;
 import org.offitec.osp.domain.enums.UserRole;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
@@ -14,8 +18,6 @@ import org.hibernate.annotations.SQLRestriction;
 @Setter
 @NoArgsConstructor
 @SuperBuilder
-@SQLDelete(sql = "UPDATE users SET is_deleted = true WHERE id=?")
-@SQLRestriction("is_deleted = false")
 public class User {
 
     @Id
@@ -47,14 +49,18 @@ public class User {
 
     private String imageUrl;
 
-    @org.hibernate.annotations.CreationTimestamp
+    @CreationTimestamp
     @Column(updatable = false)
-    private java.time.LocalDateTime createdAt;
+    private LocalDateTime createdAt;
+
+    private LocalDateTime deletedAt;
+
+    private Long deletedBy;
 
     @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private org.offitec.osp.domain.enums.UserCategory category = org.offitec.osp.domain.enums.UserCategory.A;
+    private UserCategory category = UserCategory.A;
 
     @Column(nullable = false)
     @Builder.Default

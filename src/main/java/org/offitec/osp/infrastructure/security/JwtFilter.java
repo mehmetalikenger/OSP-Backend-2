@@ -17,6 +17,9 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.offitec.osp.domain.port.UserRepositoryPort;
+import org.offitec.osp.domain.entity.User;
+import java.util.Optional;
 
 import javax.crypto.SecretKey;
 import java.io.IOException;
@@ -26,9 +29,11 @@ import java.util.Date;
 public class JwtFilter extends OncePerRequestFilter {
 
     private final String secretKeyString;
+    private final UserRepositoryPort userRepositoryPort;
 
-    public JwtFilter(@Value("${spring.security.jwt.secret-key}") String secretKeyString){
+    public JwtFilter(@Value("${spring.security.jwt.secret-key}") String secretKeyString, UserRepositoryPort userRepositoryPort){
         this.secretKeyString = secretKeyString;
+        this.userRepositoryPort = userRepositoryPort;
     }
 
     @Override
@@ -81,6 +86,19 @@ public class JwtFilter extends OncePerRequestFilter {
 
         Claims claims = (Claims) jwt.getPayload();
         String email = claims.getSubject();
+        
+        Optional<User> dbUser = userRepositoryPort.findByEmail(email);
+        if (dbUser.isEmpty() || dbUser.get().getDeletedAt() != null) {
+            if (request.getRequestURI().equals("/auth/logout")) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("User account is disabled or deleted.");
+            return;
+        }
+
         Boolean rememberMe = (Boolean) claims.get("rememberMe");
 
         Date exp = claims.getExpiration();

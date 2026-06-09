@@ -17,16 +17,20 @@ public class AdminPanelAppService {
 
     public List<UserProfileDTO> getAllUsers() {
         return adminPanelService.getAllUsersByRole(org.offitec.osp.domain.enums.UserRole.USER)
-                .stream().map(this::mapToDTO).toList();
+                .stream()
+                .filter(u -> u.getDeletedAt() == null)
+                .map(this::mapToDTO).toList();
     }
 
     public List<UserProfileDTO> getAllAdmins() {
         return adminPanelService.getAllUsersByRole(org.offitec.osp.domain.enums.UserRole.ADMIN)
-                .stream().map(this::mapToDTO).toList();
+                .stream()
+                .filter(u -> u.getDeletedAt() == null)
+                .map(this::mapToDTO).toList();
     }
 
-    public void deleteUser(Long id) {
-        adminPanelService.deleteUser(id);
+    public void deleteUser(Long id, String adminEmail) {
+        adminPanelService.deleteUser(id, adminEmail);
     }
 
     public void updateUserCategory(Long id, org.offitec.osp.domain.enums.UserCategory category) {

@@ -59,4 +59,10 @@ public class UserProfileController {
         org.offitec.osp.presentation.dto.UserProfileDTO profile = userProfileAppService.getUserProfile(id);
         return org.springframework.http.ResponseEntity.ok(profile);
     }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/delete-account/{id}")
+    public org.springframework.http.ResponseEntity<Void> deleteUserProfile(@org.springframework.web.bind.annotation.PathVariable Long id) {
+        userProfileAppService.softDeleteUser(id);
+        return org.springframework.http.ResponseEntity.ok().build();
+    }
 }

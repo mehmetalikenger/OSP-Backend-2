@@ -104,15 +104,20 @@ public class UserProfileService {
         return userRepositoryPort.findAllByRole(role);
     }
 
-    public void deleteUser(Long id) {
+
+
+    public void softDeleteUser(Long id) {
         Optional<User> dbUser = userRepositoryPort.findById(id);
-        if(dbUser.isPresent()){
-            User user = dbUser.get();
-            // Free up the email so a new user can register with it
-            user.setEmail(user.getEmail() + "_DELETED_" + java.util.UUID.randomUUID().toString());
-            userRepositoryPort.save(user);
+        if(dbUser.isEmpty()){
+            throw new RuntimeException("User not found");
         }
-        userRepositoryPort.deleteById(id);
+        User user = dbUser.get();
+        if (user.getRole() == org.offitec.osp.domain.enums.UserRole.ADMIN) {
+            throw new RuntimeException("Admins cannot delete their own accounts");
+        }
+        user.setDeletedAt(java.time.LocalDateTime.now());
+        user.setDeletedBy(user.getId());
+        userRepositoryPort.save(user);
     }
 
     public void updateUserCategory(Long id, org.offitec.osp.domain.enums.UserCategory category) {

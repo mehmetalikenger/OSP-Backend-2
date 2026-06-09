@@ -52,7 +52,8 @@ public class AdminPanelController {
 
     @org.springframework.web.bind.annotation.DeleteMapping("/user/{id}")
     public HttpStatus deleteUser(@org.springframework.web.bind.annotation.PathVariable Long id) {
-        adminPanelAppService.deleteUser(id);
+        String adminEmail = (String) org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        adminPanelAppService.deleteUser(id, adminEmail);
         return HttpStatus.OK;
     }
 

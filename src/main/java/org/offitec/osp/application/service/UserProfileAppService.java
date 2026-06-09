@@ -56,16 +56,21 @@ public class UserProfileAppService {
 
     public java.util.List<org.offitec.osp.presentation.dto.UserProfileDTO> getAllUsers() {
         return userProfileService.getAllUsersByRole(org.offitec.osp.domain.enums.UserRole.USER)
-                .stream().map(this::mapToDTO).toList();
+                .stream()
+                .filter(u -> u.getDeletedAt() == null)
+                .map(this::mapToDTO).toList();
     }
 
     public java.util.List<org.offitec.osp.presentation.dto.UserProfileDTO> getAllAdmins() {
         return userProfileService.getAllUsersByRole(org.offitec.osp.domain.enums.UserRole.ADMIN)
-                .stream().map(this::mapToDTO).toList();
+                .stream()
+                .filter(u -> u.getDeletedAt() == null)
+                .map(this::mapToDTO).toList();
     }
 
-    public void deleteUser(Long id) {
-        userProfileService.deleteUser(id);
+
+    public void softDeleteUser(Long id) {
+        userProfileService.softDeleteUser(id);
     }
 
     public void updateUserCategory(Long id, org.offitec.osp.domain.enums.UserCategory category) {

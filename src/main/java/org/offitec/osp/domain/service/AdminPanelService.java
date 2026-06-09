@@ -20,8 +20,15 @@ public class AdminPanelService {
         return userRepositoryPort.findAllByRole(role);
     }
 
-    public void deleteUser(Long id) {
-        userRepositoryPort.deleteById(id);
+    public void deleteUser(Long userId, String adminEmail) {
+        Optional<User> adminOpt = userRepositoryPort.findByEmail(adminEmail);
+        Optional<User> targetUserOpt = userRepositoryPort.findById(userId);
+        if (adminOpt.isPresent() && targetUserOpt.isPresent()) {
+            User targetUser = targetUserOpt.get();
+            targetUser.setDeletedAt(java.time.LocalDateTime.now());
+            targetUser.setDeletedBy(adminOpt.get().getId());
+            userRepositoryPort.save(targetUser);
+        }
     }
 
     public void updateUserCategory(Long id, org.offitec.osp.domain.enums.UserCategory category) {

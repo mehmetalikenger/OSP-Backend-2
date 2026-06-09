@@ -35,14 +35,34 @@ public class AuthenticationService {
             throw new UserNotFoundException("User not found.");
         }
 
-        if(!passwordEncoderPort.matches(data.password(), dbUser.get().getPassword())){
+        User user = dbUser.get();
+        boolean reactivated = false;
+
+        if (user.getDeletedAt() != null) {
+            long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(user.getDeletedAt(), java.time.LocalDateTime.now());
+            
+            if (user.getDeletedBy() != null && !user.getDeletedBy().equals(user.getId())) {
+                throw new UserNotFoundException("This account is deleted by an admin.");
+            }
+
+            if (daysBetween > 30) {
+                throw new UserNotFoundException("This account is deleted");
+            } else {
+                user.setDeletedAt(null);
+                user.setDeletedBy(null);
+                userRepositoryPort.save(user);
+                reactivated = true;
+            }
+        }
+
+        if(!passwordEncoderPort.matches(data.password(), user.getPassword())){
 
             throw new PasswordsDontMatchException("Passwords don't match.");
         }
 
-        String accessToken = tokenGeneratorPort.generateAccessToken(dbUser.get().getEmail(), dbUser.get().getRole().toString());
-        String refreshToken = tokenGeneratorPort.generateRefreshToken(dbUser.get().getEmail(), dbUser.get().getRole().toString(), data.rememberMe());
+        String accessToken = tokenGeneratorPort.generateAccessToken(user.getEmail(), user.getRole().toString());
+        String refreshToken = tokenGeneratorPort.generateRefreshToken(user.getEmail(), user.getRole().toString(), data.rememberMe());
 
-      return new UserAuthResponseData(dbUser.get().getId(), dbUser.get().getRole().toString(), accessToken, refreshToken);
+      return new UserAuthResponseData(user.getId(), user.getRole().toString(), accessToken, refreshToken, reactivated);
     }
 }
