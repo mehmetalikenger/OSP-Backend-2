@@ -34,6 +34,8 @@ public class User {
     @Column(nullable = false)
     private String password;
 
+    private LocalDateTime passwordUpdateDate;
+
     @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -65,4 +67,9 @@ public class User {
     @Column(nullable = false)
     @Builder.Default
     private boolean isDeleted = false;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private org.offitec.osp.domain.enums.UserStatus status = org.offitec.osp.domain.enums.UserStatus.ACTIVE;
 }

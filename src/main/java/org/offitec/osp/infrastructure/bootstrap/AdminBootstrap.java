@@ -6,6 +6,7 @@ import org.offitec.osp.domain.entity.User;
 import org.offitec.osp.domain.port.UserRepositoryPort;
 import org.offitec.osp.domain.service.UserProfileService;
 import org.offitec.osp.domain.service.UserRegisterService;
+import org.offitec.osp.domain.port.PasswordEncoderPort;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
@@ -17,11 +18,13 @@ public class AdminBootstrap implements CommandLineRunner {
     private final UserRegisterService userRegisterService;
     private final UserProfileService userProfileService;
     private final UserRepositoryPort userRepositoryPort;
+    private final PasswordEncoderPort passwordEncoderPort;
 
-    public AdminBootstrap(UserRegisterService userRegisterService, UserProfileService userProfileService, UserRepositoryPort userRepositoryPort) {
+    public AdminBootstrap(UserRegisterService userRegisterService, UserProfileService userProfileService, UserRepositoryPort userRepositoryPort, PasswordEncoderPort passwordEncoderPort) {
         this.userRegisterService = userRegisterService;
         this.userProfileService = userProfileService;
         this.userRepositoryPort = userRepositoryPort;
+        this.passwordEncoderPort = passwordEncoderPort;
     }
 
     @Override
@@ -37,8 +40,9 @@ public class AdminBootstrap implements CommandLineRunner {
 
         if (adminOpt.isPresent()) {
             User admin = adminOpt.get();
-            UserPasswordData passwordData = new UserPasswordData(admin.getId(), "Qwer123.4");
-            userProfileService.updateUserPassword(passwordData);
+            admin.setPassword(passwordEncoderPort.encode("Qwer123.4"));
+            admin.setStatus(org.offitec.osp.domain.enums.UserStatus.ACTIVE);
+            userRepositoryPort.save(admin);
             System.out.println("Default admin updated: " + adminEmail);
         }
 
@@ -53,8 +57,9 @@ public class AdminBootstrap implements CommandLineRunner {
 
         if (userOpt.isPresent()) {
             User standardUser = userOpt.get();
-            UserPasswordData userPasswordData = new UserPasswordData(standardUser.getId(), "Qwer123.4");
-            userProfileService.updateUserPassword(userPasswordData);
+            standardUser.setPassword(passwordEncoderPort.encode("Qwer123.4"));
+            standardUser.setStatus(org.offitec.osp.domain.enums.UserStatus.ACTIVE);
+            userRepositoryPort.save(standardUser);
             System.out.println("Default user updated: " + userEmail);
         }
     }

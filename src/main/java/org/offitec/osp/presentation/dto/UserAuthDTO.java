@@ -14,3 +14,4 @@ public class UserAuthDTO {
 
     private boolean rememberMe;
 }
+

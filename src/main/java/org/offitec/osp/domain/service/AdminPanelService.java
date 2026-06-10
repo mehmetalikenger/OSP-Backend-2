@@ -27,6 +27,7 @@ public class AdminPanelService {
             User targetUser = targetUserOpt.get();
             targetUser.setDeletedAt(java.time.LocalDateTime.now());
             targetUser.setDeletedBy(adminOpt.get().getId());
+            targetUser.setStatus(org.offitec.osp.domain.enums.UserStatus.DELETED);
             userRepositoryPort.save(targetUser);
         }
     }

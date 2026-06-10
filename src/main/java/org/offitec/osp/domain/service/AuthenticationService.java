@@ -50,6 +50,7 @@ public class AuthenticationService {
             } else {
                 user.setDeletedAt(null);
                 user.setDeletedBy(null);
+                user.setStatus(org.offitec.osp.domain.enums.UserStatus.ACTIVE);
                 userRepositoryPort.save(user);
                 reactivated = true;
             }

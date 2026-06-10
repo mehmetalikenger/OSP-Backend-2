@@ -52,7 +52,8 @@ public class AdminPanelAppService {
             user.getCity(),
             surname,
             user.getCategory(),
-            user.getCreatedAt()
+            user.getCreatedAt(),
+            user.getStatus()
         );
     }
 }

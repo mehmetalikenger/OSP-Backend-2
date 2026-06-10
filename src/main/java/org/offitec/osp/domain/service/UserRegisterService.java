@@ -22,6 +22,9 @@ public class UserRegisterService {
     private final TemporaryPasswordGeneratorPort temporaryPasswordGeneratorPort;
     private final PasswordEncoderPort passwordEncoderPort;
 
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entityManager;
+
     public UserRegisterService(AdminRepositoryPort adminRepositoryPort, UserRepositoryPort userRepositoryPort, TemporaryPasswordGeneratorPort temporaryPasswordGeneratorPort,
                                PasswordEncoderPort passwordEncoderPort){
 
@@ -40,6 +43,7 @@ public class UserRegisterService {
                 User user = dbUser.get();
                 user.setDeletedAt(null);
                 user.setDeletedBy(null);
+                user.setStatus(org.offitec.osp.domain.enums.UserStatus.PENDING);
                 String rawPassword = temporaryPasswordGeneratorPort.generate();
                 String hashedPassword = passwordEncoderPort.encode(rawPassword);
                 user.setPassword(hashedPassword);
@@ -58,27 +62,48 @@ public class UserRegisterService {
                 .email(data.email())
                 .password(hashedPassword)
                 .category(data.category() != null ? data.category() : org.offitec.osp.domain.enums.UserCategory.A)
+                .status(org.offitec.osp.domain.enums.UserStatus.PENDING)
                 .build();
 
         userRepositoryPort.save(user);
     }
 
+    @org.springframework.transaction.annotation.Transactional
     public void AdminRegister(AdminRegisterData data){
 
-        Optional<Admin> dbAdmin =  adminRepositoryPort.findByEmail(data.email());
+        Optional<User> dbUser =  userRepositoryPort.findByEmail(data.email());
 
-        if(dbAdmin.isPresent()){
-            if (dbAdmin.get().getDeletedAt() != null) {
-                Admin admin = dbAdmin.get();
-                admin.setDeletedAt(null);
-                admin.setDeletedBy(null);
+        if(dbUser.isPresent()){
+            User user = dbUser.get();
+            if (user instanceof Admin) {
+                Admin admin = (Admin) user;
+                if (admin.getDeletedAt() != null) {
+                    admin.setDeletedAt(null);
+                    admin.setDeletedBy(null);
+                    admin.setStatus(org.offitec.osp.domain.enums.UserStatus.PENDING);
+                    String rawPassword = temporaryPasswordGeneratorPort.generate();
+                    String hashedPassword = passwordEncoderPort.encode(rawPassword);
+                    admin.setPassword(hashedPassword);
+                    adminRepositoryPort.save(admin);
+                    return;
+                }
+                throw new AdminAlreadyExistsException("This admin already exists.");
+            } else {
+                user.setDeletedAt(null);
+                user.setDeletedBy(null);
+                user.setRole(UserRole.ADMIN);
+                user.setStatus(org.offitec.osp.domain.enums.UserStatus.PENDING);
                 String rawPassword = temporaryPasswordGeneratorPort.generate();
                 String hashedPassword = passwordEncoderPort.encode(rawPassword);
-                admin.setPassword(hashedPassword);
-                adminRepositoryPort.save(admin);
+                user.setPassword(hashedPassword);
+                
+                userRepositoryPort.save(user);
+                
+                entityManager.createNativeQuery("INSERT INTO admin (id) VALUES (:id)")
+                        .setParameter("id", user.getId())
+                        .executeUpdate();
                 return;
             }
-            throw new AdminAlreadyExistsException("This admin already exists.");
         }
 
         String rawPassword = temporaryPasswordGeneratorPort.generate();
@@ -89,6 +114,7 @@ public class UserRegisterService {
                         .email(data.email())
                         .password(hashedPassword)
                         .role(UserRole.ADMIN)
+                        .status(org.offitec.osp.domain.enums.UserStatus.PENDING)
                         .build();
 
         adminRepositoryPort.save(admin);

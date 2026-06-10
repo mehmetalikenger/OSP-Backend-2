@@ -37,6 +37,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests((authorize) -> authorize
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/auth", "/auth/logout", "/error").permitAll()
+                        .requestMatchers("/account/activate", "/account/forgot-password-request", "/account/reset-password", "/account/delete-account").permitAll()
                         .requestMatchers("/admin/**").hasAuthority("ADMIN")
                         .anyRequest().authenticated()
                 )

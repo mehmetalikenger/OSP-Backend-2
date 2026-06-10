@@ -19,6 +19,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.offitec.osp.domain.port.UserRepositoryPort;
 import org.offitec.osp.domain.entity.User;
+
+import java.time.Instant;
 import java.util.Optional;
 
 import javax.crypto.SecretKey;
@@ -28,11 +30,11 @@ import java.util.Date;
 @Component
 public class JwtFilter extends OncePerRequestFilter {
 
-    private final String secretKeyString;
+    private final JwtService jwtService;
     private final UserRepositoryPort userRepositoryPort;
 
-    public JwtFilter(@Value("${spring.security.jwt.secret-key}") String secretKeyString, UserRepositoryPort userRepositoryPort){
-        this.secretKeyString = secretKeyString;
+    public JwtFilter(JwtService jwtService, UserRepositoryPort userRepositoryPort){
+        this.jwtService = jwtService;
         this.userRepositoryPort = userRepositoryPort;
     }
 
@@ -58,6 +60,21 @@ public class JwtFilter extends OncePerRequestFilter {
                         token = cookie.getValue();
                         break;
                     }
+
+                    if (cookie.getName().equals("accountActivationToken")) {
+                        token = cookie.getValue();
+                        break;
+                    }
+
+                    if (cookie.getName().equals("resetPasswordToken")) {
+                        token = cookie.getValue();
+                        break;
+                    }
+
+                    if (cookie.getName().equals("accountDeletionToken")) {
+                        token = cookie.getValue();
+                        break;
+                    }
                 }
             }
         }
@@ -67,7 +84,15 @@ public class JwtFilter extends OncePerRequestFilter {
             return;
         }
 
-        SecretKey key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secretKeyString));
+        SecretKey key = jwtService.getSecretKey();
+        String uri = request.getRequestURI();
+        if (uri.equals("/account/activate")) {
+            key = jwtService.getAccountActivationKey();
+        } else if (uri.equals("/account/reset-password")) {
+            key = jwtService.getResetPasswordKey();
+        } else if (uri.equals("/account/delete-account")) {
+            key = jwtService.getAccountDeletionKey();
+        }
 
         Jwt<?,?> jwt = null;
 
@@ -85,30 +110,111 @@ public class JwtFilter extends OncePerRequestFilter {
         }
 
         Claims claims = (Claims) jwt.getPayload();
+
         String email = claims.getSubject();
-        
+
         Optional<User> dbUser = userRepositoryPort.findByEmail(email);
         if (dbUser.isEmpty() || dbUser.get().getDeletedAt() != null) {
             if (request.getRequestURI().equals("/auth/logout")) {
                 filterChain.doFilter(request, response);
                 return;
             }
+
+            jakarta.servlet.http.Cookie accessTokenCookie = new jakarta.servlet.http.Cookie("accessToken", null);
+            accessTokenCookie.setPath("/");
+            accessTokenCookie.setHttpOnly(true);
+            accessTokenCookie.setMaxAge(0);
+            response.addCookie(accessTokenCookie);
+
+            jakarta.servlet.http.Cookie refreshTokenCookie = new jakarta.servlet.http.Cookie("refreshToken", null);
+            refreshTokenCookie.setPath("/");
+            refreshTokenCookie.setHttpOnly(true);
+            refreshTokenCookie.setMaxAge(0);
+            response.addCookie(refreshTokenCookie);
+
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
-            response.getWriter().write("User account is disabled or deleted.");
+            response.getWriter().write("{\"error\": \"Unauthorized\", \"message\": \"User account is disabled or deleted.\"}");
             return;
         }
 
-        Boolean rememberMe = (Boolean) claims.get("rememberMe");
+        String tokenType = (String) claims.get("tokenType");
 
-        Date exp = claims.getExpiration();
+        if (tokenType != null && tokenType.equals("ACCOUNT_ACTIVATION")) {
+            
+            if (!request.getRequestURI().equals("/account/activate")) {
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.setContentType("application/json");
+                response.getWriter().write("You do not have permission to access this resource.");
+                return;
+            }
+
+            if(dbUser.get().getStatus().toString().equals("ACTIVE")){
+                response.setStatus(HttpServletResponse.SC_CONFLICT);
+                response.setContentType("application/json");
+                response.getWriter().write("Account is already activated.");
+                return;
+            }
+        }
+
+        if (tokenType != null && tokenType.equals("RESET_PASSWORD")) {
+
+            if (!request.getRequestURI().equals("/account/reset-password")) {
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.setContentType("application/json");
+                response.getWriter().write("You do not have permission to access this resource.");
+                return;
+            }
+
+            if(claims.getExpiration().toInstant().isBefore(Instant.now())){
+                response.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
+                response.setContentType("application/json");
+                response.getWriter().write("This password reset link is no longer valid.");
+            }
+
+            if (dbUser.get().getPasswordUpdateDate() != null && claims.getIssuedAt() != null) {
+                java.time.LocalDateTime issuedAt = java.time.LocalDateTime.ofInstant(claims.getIssuedAt().toInstant(), java.time.ZoneId.systemDefault());
+
+                if (dbUser.get().getPasswordUpdateDate().isAfter(issuedAt)) {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json");
+                    response.getWriter().write("This password reset link is no longer valid.");
+                    return;
+                }
+            }
+        }
+
+        if (tokenType != null && tokenType.equals("ACCOUNT_DELETION")) {
+            
+            if (!request.getRequestURI().equals("/account/delete-account")) {
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.setContentType("application/json");
+                response.getWriter().write("You do not have permission to access this resource.");
+                return;
+            }
+
+            if(claims.getExpiration().toInstant().isBefore(Instant.now())){
+                response.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
+                response.setContentType("application/json");
+                response.getWriter().write("This account deletion link is no longer valid.");
+            }
+
+            if(dbUser.get().getStatus().toString().equals("DELETED")){
+                response.setStatus(HttpServletResponse.SC_CONFLICT);
+                response.setContentType("application/json");
+                response.getWriter().write("Account is already deleted.");
+                return;
+            }
+        }
+
+        Boolean rememberMe = (Boolean) claims.get("rememberMe");
 
         String role = claims.get("role", String.class);
 
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         
         java.util.List<org.springframework.security.core.GrantedAuthority> authorities = 
-            role != null ? java.util.Collections.singletonList(new org.springframework.security.core.authority.SimpleGrantedAuthority(role)) 
+            (role != null && !role.trim().isEmpty()) ? java.util.Collections.singletonList(new org.springframework.security.core.authority.SimpleGrantedAuthority(role)) 
                          : java.util.Collections.emptyList();
 
         Authentication authentication = UsernamePasswordAuthenticationToken.authenticated(email, rememberMe, authorities);

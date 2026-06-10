@@ -45,7 +45,7 @@ public class UserProfileAppService {
 
     public void updateUserPassword(UserPasswordDTO dto){
 
-        UserPasswordData data = new UserPasswordData(dto.getId(), dto.getPassword());
+        UserPasswordData data = new UserPasswordData(dto.getId(), dto.getCurrentPassword(), dto.getPassword());
         userProfileService.updateUserPassword(data);
     }
 
@@ -69,8 +69,8 @@ public class UserProfileAppService {
     }
 
 
-    public void softDeleteUser(Long id) {
-        userProfileService.softDeleteUser(id);
+    public void softDeleteUser(Long id, String adminEmail) {
+        userProfileService.softDeleteUser(id, adminEmail);
     }
 
     public void updateUserCategory(Long id, org.offitec.osp.domain.enums.UserCategory category) {
@@ -92,7 +92,8 @@ public class UserProfileAppService {
             user.getCity(),
             surname,
             user.getCategory(),
-            user.getCreatedAt()
+            user.getCreatedAt(),
+            user.getStatus()
         );
     }
 }

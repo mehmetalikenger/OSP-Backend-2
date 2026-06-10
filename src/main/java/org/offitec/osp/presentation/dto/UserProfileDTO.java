@@ -20,4 +20,5 @@ public class UserProfileDTO {
     private String surname;
     private org.offitec.osp.domain.enums.UserCategory category;
     private java.time.LocalDateTime createdAt;
+    private org.offitec.osp.domain.enums.UserStatus status;
 }

@@ -47,11 +47,13 @@ public class UserProfileController {
     }
 
     @PostMapping("/update-password")
-    public HttpStatus updateUserPassword(@Valid @RequestBody UserPasswordDTO dto){
-
-        userProfileAppService.updateUserPassword(dto);
-
-        return HttpStatus.OK;
+    public org.springframework.http.ResponseEntity<?> updateUserPassword(@Valid @RequestBody UserPasswordDTO dto){
+        try {
+            userProfileAppService.updateUserPassword(dto);
+            return org.springframework.http.ResponseEntity.ok().build();
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            return org.springframework.http.ResponseEntity.status(e.getStatusCode()).body(java.util.Map.of("message", e.getReason()));
+        }
     }
 
     @org.springframework.web.bind.annotation.GetMapping("/{id}")
@@ -62,7 +64,8 @@ public class UserProfileController {
 
     @org.springframework.web.bind.annotation.DeleteMapping("/delete-account/{id}")
     public org.springframework.http.ResponseEntity<Void> deleteUserProfile(@org.springframework.web.bind.annotation.PathVariable Long id) {
-        userProfileAppService.softDeleteUser(id);
+        String adminEmail = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        userProfileAppService.softDeleteUser(id, adminEmail);
         return org.springframework.http.ResponseEntity.ok().build();
     }
 }

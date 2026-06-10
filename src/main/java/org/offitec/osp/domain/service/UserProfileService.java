@@ -11,6 +11,9 @@ import org.offitec.osp.domain.port.PasswordEncoderPort;
 import org.offitec.osp.domain.port.UserRepositoryPort;
 import org.springframework.stereotype.Service;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
 import java.util.Optional;
 
 @Service
@@ -86,6 +89,14 @@ public class UserProfileService {
 
         User user = dbUser.get();
 
+        if (!passwordEncoderPort.matches(data.currentPassword(), user.getPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Current password is incorrect");
+        }
+
+        if (passwordEncoderPort.matches(data.password(), user.getPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "New password cannot be the same as the current password");
+        }
+
         String hashedPassword = passwordEncoderPort.encode(data.password());
 
         user.setPassword(hashedPassword);
@@ -106,7 +117,7 @@ public class UserProfileService {
 
 
 
-    public void softDeleteUser(Long id) {
+    public void softDeleteUser(Long id, String adminEmail) {
         Optional<User> dbUser = userRepositoryPort.findById(id);
         if(dbUser.isEmpty()){
             throw new RuntimeException("User not found");
@@ -115,8 +126,13 @@ public class UserProfileService {
         if (user.getRole() == org.offitec.osp.domain.enums.UserRole.ADMIN) {
             throw new RuntimeException("Admins cannot delete their own accounts");
         }
+        
+        Optional<User> adminUser = userRepositoryPort.findByEmail(adminEmail);
+        Long adminId = adminUser.map(User::getId).orElse(null);
+
         user.setDeletedAt(java.time.LocalDateTime.now());
-        user.setDeletedBy(user.getId());
+        user.setDeletedBy(adminId);
+        user.setStatus(org.offitec.osp.domain.enums.UserStatus.DELETED);
         userRepositoryPort.save(user);
     }
 

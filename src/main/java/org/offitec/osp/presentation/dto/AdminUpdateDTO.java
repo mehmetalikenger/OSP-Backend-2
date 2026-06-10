@@ -11,4 +11,6 @@ public class AdminUpdateDTO extends UserUpdateDTO {
 
     @NotBlank(message = "Surname can't be blank.")
     private String surname;
+
+    private org.offitec.osp.domain.enums.UserStatus status;
 }
