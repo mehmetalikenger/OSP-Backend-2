@@ -1,4 +1,4 @@
 package org.offitec.osp.domain.data;
 
-public record AdminRegisterData(String email) {
+public record AdminRegisterData(String email, String adminEmail) {
 }

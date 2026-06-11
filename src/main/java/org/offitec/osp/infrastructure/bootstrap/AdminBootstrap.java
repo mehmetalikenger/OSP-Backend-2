@@ -34,7 +34,7 @@ public class AdminBootstrap implements CommandLineRunner {
         Optional<User> adminOpt = userRepositoryPort.findByEmail(adminEmail);
 
         if (adminOpt.isEmpty()) {
-            userRegisterService.AdminRegister(new AdminRegisterData(adminEmail));
+            userRegisterService.AdminRegister(new AdminRegisterData(adminEmail, null));
             adminOpt = userRepositoryPort.findByEmail(adminEmail);
         }
 
@@ -51,7 +51,7 @@ public class AdminBootstrap implements CommandLineRunner {
         Optional<User> userOpt = userRepositoryPort.findByEmail(userEmail);
 
         if (userOpt.isEmpty()) {
-            userRegisterService.UserRegister(new org.offitec.osp.domain.data.UserRegisterData(userEmail, org.offitec.osp.domain.enums.UserCategory.A));
+            userRegisterService.UserRegister(new org.offitec.osp.domain.data.UserRegisterData(userEmail, org.offitec.osp.domain.enums.UserCategory.A, null));
             userOpt = userRepositoryPort.findByEmail(userEmail);
         }
 

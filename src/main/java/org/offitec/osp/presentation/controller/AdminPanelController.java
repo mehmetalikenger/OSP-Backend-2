@@ -27,7 +27,8 @@ public class AdminPanelController {
     @PostMapping("/user-register")
     public HttpStatus userAdmin(@Valid @RequestBody UserRegisterDTO dto){
 
-        adminRegisterAppService.UserRegister(dto);
+        String adminEmail = (String) org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        adminRegisterAppService.UserRegister(dto, adminEmail);
 
         return HttpStatus.OK;
     }
@@ -35,7 +36,8 @@ public class AdminPanelController {
     @PostMapping("/admin-register")
     public HttpStatus registerAdmin(@Valid @RequestBody AdminRegisterDTO dto){
 
-        adminRegisterAppService.AdminRegister(dto);
+        String adminEmail = (String) org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        adminRegisterAppService.AdminRegister(dto, adminEmail);
 
         return HttpStatus.OK;
     }
@@ -61,7 +63,8 @@ public class AdminPanelController {
     public HttpStatus updateCategory(@RequestBody java.util.Map<String, String> payload) {
         Long userId = Long.valueOf(payload.get("userId"));
         org.offitec.osp.domain.enums.UserCategory category = org.offitec.osp.domain.enums.UserCategory.valueOf(payload.get("category"));
-        adminPanelAppService.updateUserCategory(userId, category);
+        String adminEmail = (String) org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        adminPanelAppService.updateUserCategory(userId, category, adminEmail);
         return HttpStatus.OK;
     }
 }

@@ -33,8 +33,8 @@ public class AdminPanelAppService {
         adminPanelService.deleteUser(id, adminEmail);
     }
 
-    public void updateUserCategory(Long id, org.offitec.osp.domain.enums.UserCategory category) {
-        adminPanelService.updateUserCategory(id, category);
+    public void updateUserCategory(Long id, org.offitec.osp.domain.enums.UserCategory category, String adminEmail) {
+        adminPanelService.updateUserCategory(id, category, adminEmail);
     }
 
     private UserProfileDTO mapToDTO(org.offitec.osp.domain.entity.User user) {

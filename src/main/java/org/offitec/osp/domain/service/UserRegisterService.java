@@ -21,17 +21,19 @@ public class UserRegisterService {
     private final AdminRepositoryPort adminRepositoryPort;
     private final TemporaryPasswordGeneratorPort temporaryPasswordGeneratorPort;
     private final PasswordEncoderPort passwordEncoderPort;
+    private final AuditLogService auditLogService;
 
     @jakarta.persistence.PersistenceContext
     private jakarta.persistence.EntityManager entityManager;
 
     public UserRegisterService(AdminRepositoryPort adminRepositoryPort, UserRepositoryPort userRepositoryPort, TemporaryPasswordGeneratorPort temporaryPasswordGeneratorPort,
-                               PasswordEncoderPort passwordEncoderPort){
+                               PasswordEncoderPort passwordEncoderPort, AuditLogService auditLogService){
 
         this.userRepositoryPort = userRepositoryPort;
         this.adminRepositoryPort = adminRepositoryPort;
         this.temporaryPasswordGeneratorPort = temporaryPasswordGeneratorPort;
         this.passwordEncoderPort = passwordEncoderPort;
+        this.auditLogService = auditLogService;
     }
 
     @org.springframework.transaction.annotation.Transactional
@@ -51,12 +53,13 @@ public class UserRegisterService {
                 user.setCategory(data.category() != null ? data.category() : org.offitec.osp.domain.enums.UserCategory.A);
                 
                 user.setRole(UserRole.USER);
-                userRepositoryPort.save(user);
+                user = userRepositoryPort.save(user);
                 
                 entityManager.createNativeQuery("DELETE FROM admin WHERE id = :id")
                         .setParameter("id", user.getId())
                         .executeUpdate();
                         
+                logCreationAction(data.adminEmail(), "USER", user.getId(), "Re-activated standard user");
                 return true;
             }
             throw new AdminAlreadyExistsException("This user already exists.");
@@ -73,7 +76,8 @@ public class UserRegisterService {
                 .status(org.offitec.osp.domain.enums.UserStatus.PENDING)
                 .build();
 
-        userRepositoryPort.save(user);
+        user = userRepositoryPort.save(user);
+        logCreationAction(data.adminEmail(), "USER", user.getId(), "Created standard user");
         return true;
     }
 
@@ -92,7 +96,8 @@ public class UserRegisterService {
                     String rawPassword = temporaryPasswordGeneratorPort.generate();
                     String hashedPassword = passwordEncoderPort.encode(rawPassword);
                     user.setPassword(hashedPassword);
-                    userRepositoryPort.save(user);
+                    user = userRepositoryPort.save(user);
+                    logCreationAction(data.adminEmail(), "ADMIN", user.getId(), "Re-activated admin user");
                     return true;
                 }
                 throw new AdminAlreadyExistsException("This admin already exists.");
@@ -112,11 +117,12 @@ public class UserRegisterService {
                     requiresActivation = true;
                 }
 
-                userRepositoryPort.save(user);
+                user = userRepositoryPort.save(user);
                 
                 entityManager.createNativeQuery("INSERT INTO admin (id) VALUES (:id)")
                         .setParameter("id", user.getId())
                         .executeUpdate();
+                logCreationAction(data.adminEmail(), "ADMIN", user.getId(), "Promoted user to admin");
                 return requiresActivation;
             }
         }
@@ -132,7 +138,19 @@ public class UserRegisterService {
                         .status(org.offitec.osp.domain.enums.UserStatus.PENDING)
                         .build();
 
-        adminRepositoryPort.save(admin);
+        admin = adminRepositoryPort.save(admin);
+        logCreationAction(data.adminEmail(), "ADMIN", admin.getId(), "Created admin user");
         return true;
+    }
+
+    private void logCreationAction(String adminEmail, String entityType, Long entityId, String details) {
+        Long adminId = -1L;
+        if (adminEmail != null) {
+            Optional<User> adminOpt = userRepositoryPort.findByEmail(adminEmail);
+            if (adminOpt.isPresent()) {
+                adminId = adminOpt.get().getId();
+            }
+        }
+        auditLogService.logAdminAction(adminId, "CREATE", entityType, entityId, details);
     }
 }

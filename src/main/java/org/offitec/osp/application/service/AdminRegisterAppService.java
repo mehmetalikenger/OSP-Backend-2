@@ -23,9 +23,9 @@ public class AdminRegisterAppService {
         this.mailService = mailService;
     }
 
-    public void AdminRegister(AdminRegisterDTO dto){
+    public void AdminRegister(AdminRegisterDTO dto, String adminEmail){
 
-        AdminRegisterData data = new AdminRegisterData(dto.getEmail());
+        AdminRegisterData data = new AdminRegisterData(dto.getEmail(), adminEmail);
         boolean requiresActivation = userRegisterService.AdminRegister(data);
 
         if (requiresActivation) {
@@ -38,9 +38,9 @@ public class AdminRegisterAppService {
         }
     }
 
-    public void UserRegister(UserRegisterDTO dto){
+    public void UserRegister(UserRegisterDTO dto, String adminEmail){
 
-        UserRegisterData data = new UserRegisterData(dto.getEmail(), dto.getCategory());
+        UserRegisterData data = new UserRegisterData(dto.getEmail(), dto.getCategory(), adminEmail);
         boolean requiresActivation = userRegisterService.UserRegister(data);
 
         if (requiresActivation) {
