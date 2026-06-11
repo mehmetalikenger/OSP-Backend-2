@@ -115,8 +115,6 @@ public class UserProfileService {
         return userRepositoryPort.findAllByRole(role);
     }
 
-
-
     public void softDeleteUser(Long id, String adminEmail) {
         Optional<User> dbUser = userRepositoryPort.findById(id);
         if(dbUser.isEmpty()){

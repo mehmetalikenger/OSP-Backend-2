@@ -26,26 +26,30 @@ public class AdminRegisterAppService {
     public void AdminRegister(AdminRegisterDTO dto){
 
         AdminRegisterData data = new AdminRegisterData(dto.getEmail());
-        userRegisterService.AdminRegister(data);
+        boolean requiresActivation = userRegisterService.AdminRegister(data);
 
-        try {
-            String token = jwtService.generateActivationToken(dto.getEmail(), 2592000); // 30 days
-            mailService.sendActivationEmail(dto.getEmail(), token);
-        } catch (Exception e) {
-            e.printStackTrace();
+        if (requiresActivation) {
+            try {
+                String token = jwtService.generateActivationToken(dto.getEmail(), 2592000); // 30 days
+                mailService.sendActivationEmail(dto.getEmail(), token);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
 
     public void UserRegister(UserRegisterDTO dto){
 
         UserRegisterData data = new UserRegisterData(dto.getEmail(), dto.getCategory());
-        userRegisterService.UserRegister(data);
+        boolean requiresActivation = userRegisterService.UserRegister(data);
 
-        try {
-            String token = jwtService.generateActivationToken(dto.getEmail(), 2592000); // 30 days
-            mailService.sendActivationEmail(dto.getEmail(), token);
-        } catch (Exception e) {
-            e.printStackTrace();
+        if (requiresActivation) {
+            try {
+                String token = jwtService.generateActivationToken(dto.getEmail(), 2592000); // 30 days
+                mailService.sendActivationEmail(dto.getEmail(), token);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
 }

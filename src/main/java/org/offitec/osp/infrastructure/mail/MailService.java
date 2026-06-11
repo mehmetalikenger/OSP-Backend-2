@@ -21,8 +21,8 @@ public class MailService {
                 .queryString("from", "OSP Support <no-reply@pinextra.com>")
                 .queryString("to", email)
                 .queryString("subject", "Account Activation")
-                .queryString("text", "Please activate your account by clicking the following link: http://localhost:3000/activate?token=" + token)
-                .queryString("html", buildHtmlTemplate("Account Activation", "Welcome to OSP! Please activate your account by clicking the button below:", "http://localhost:3000/activate?token=" + token, "Activate Account"))
+                .queryString("text", "Please activate your account by clicking the following link: http://192.168.10.12:3000/activate?token=" + token)
+                .queryString("html", buildHtmlTemplate("Account Activation", "Welcome to OSP! Please activate your account by clicking the button below:", "http://192.168.10.12:3000/activate?token=" + token, "Activate Account"))
                 .asJson();
 
 
@@ -41,8 +41,8 @@ public class MailService {
                 .queryString("from", "OSP Support <no-reply@pinextra.com>")
                 .queryString("to", email)
                 .queryString("subject", "Forgot Password")
-                .queryString("text", "You requested a password reset. Please click the following link to reset your password: http://localhost:3000/reset-password?token=" + token)
-                .queryString("html", buildHtmlTemplate("Reset Password", "You requested a password reset. Please click the button below to reset your password:", "http://localhost:3000/reset-password?token=" + token, "Reset Password"))
+                .queryString("text", "You requested a password reset. Please click the following link to reset your password: http://192.168.10.12:3000/reset-password?token=" + token)
+                .queryString("html", buildHtmlTemplate("Reset Password", "You requested a password reset. Please click the button below to reset your password:", "http://192.168.10.12:3000/reset-password?token=" + token, "Reset Password"))
                 .asJson();
 
 
@@ -62,8 +62,8 @@ public class MailService {
                 .queryString("from", "OSP Support <no-reply@pinextra.com>")
                 .queryString("to", email)
                 .queryString("subject", "Delete Account")
-                .queryString("text", "You requested to delete your account. Please click the following link to confirm: http://localhost:3000/delete-account?token=" + token)
-                .queryString("html", buildHtmlTemplate("Delete Account", "You requested to delete your account. Please click the button below to confirm this action. This cannot be undone.", "http://localhost:3000/delete-account?token=" + token, "Confirm Deletion"))
+                .queryString("text", "You requested to delete your account. Please click the following link to confirm: http://192.168.10.12:3000/delete-account?token=" + token)
+                .queryString("html", buildHtmlTemplate("Delete Account", "You requested to delete your account. Please click the button below to confirm this action. This cannot be undone.", "http://192.168.10.12:3000/delete-account?token=" + token, "Confirm Deletion"))
                 .asJson();
 
 
@@ -72,7 +72,7 @@ public class MailService {
     }
 
     private String buildHtmlTemplate(String title, String message, String actionUrl, String actionText) {
-        String baseUrl = "http://localhost:3000";
+        String baseUrl = "http://192.168.10.12:3000";
         return String.format(
             "<!DOCTYPE html>" +
             "<html>" +

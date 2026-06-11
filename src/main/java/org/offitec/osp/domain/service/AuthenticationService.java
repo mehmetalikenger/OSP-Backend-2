@@ -41,8 +41,13 @@ public class AuthenticationService {
         if (user.getDeletedAt() != null) {
             long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(user.getDeletedAt(), java.time.LocalDateTime.now());
             
-            if (user.getDeletedBy() != null && !user.getDeletedBy().equals(user.getId())) {
-                throw new UserNotFoundException("This account is deleted by an admin.");
+            if (user.getDeletedBy() != null) {
+                if (user.getDeletedBy().equals(user.getId()) && user.getRole() != org.offitec.osp.domain.enums.UserRole.ADMIN) {
+                    // Regular user self-deletion, allow recovery
+                } else {
+                    // Admin deleted this account (either themselves or someone else)
+                    throw new UserNotFoundException("This account is deleted by an admin.");
+                }
             }
 
             if (daysBetween > 30) {

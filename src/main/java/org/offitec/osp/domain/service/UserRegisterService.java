@@ -34,7 +34,8 @@ public class UserRegisterService {
         this.passwordEncoderPort = passwordEncoderPort;
     }
 
-    public void UserRegister(UserRegisterData data){
+    @org.springframework.transaction.annotation.Transactional
+    public boolean UserRegister(UserRegisterData data){
 
         Optional<User> dbUser =  userRepositoryPort.findByEmail(data.email());
 
@@ -48,8 +49,15 @@ public class UserRegisterService {
                 String hashedPassword = passwordEncoderPort.encode(rawPassword);
                 user.setPassword(hashedPassword);
                 user.setCategory(data.category() != null ? data.category() : org.offitec.osp.domain.enums.UserCategory.A);
+                
+                user.setRole(UserRole.USER);
                 userRepositoryPort.save(user);
-                return;
+                
+                entityManager.createNativeQuery("DELETE FROM admin WHERE id = :id")
+                        .setParameter("id", user.getId())
+                        .executeUpdate();
+                        
+                return true;
             }
             throw new AdminAlreadyExistsException("This user already exists.");
         }
@@ -66,43 +74,50 @@ public class UserRegisterService {
                 .build();
 
         userRepositoryPort.save(user);
+        return true;
     }
 
     @org.springframework.transaction.annotation.Transactional
-    public void AdminRegister(AdminRegisterData data){
+    public boolean AdminRegister(AdminRegisterData data){
 
         Optional<User> dbUser =  userRepositoryPort.findByEmail(data.email());
 
         if(dbUser.isPresent()){
             User user = dbUser.get();
-            if (user instanceof Admin) {
-                Admin admin = (Admin) user;
-                if (admin.getDeletedAt() != null) {
-                    admin.setDeletedAt(null);
-                    admin.setDeletedBy(null);
-                    admin.setStatus(org.offitec.osp.domain.enums.UserStatus.PENDING);
+            if (user instanceof Admin || user.getRole() == UserRole.ADMIN) {
+                if (user.getDeletedAt() != null) {
+                    user.setDeletedAt(null);
+                    user.setDeletedBy(null);
+                    user.setStatus(org.offitec.osp.domain.enums.UserStatus.PENDING);
                     String rawPassword = temporaryPasswordGeneratorPort.generate();
                     String hashedPassword = passwordEncoderPort.encode(rawPassword);
-                    admin.setPassword(hashedPassword);
-                    adminRepositoryPort.save(admin);
-                    return;
+                    user.setPassword(hashedPassword);
+                    userRepositoryPort.save(user);
+                    return true;
                 }
                 throw new AdminAlreadyExistsException("This admin already exists.");
             } else {
-                user.setDeletedAt(null);
-                user.setDeletedBy(null);
                 user.setRole(UserRole.ADMIN);
-                user.setStatus(org.offitec.osp.domain.enums.UserStatus.PENDING);
-                String rawPassword = temporaryPasswordGeneratorPort.generate();
-                String hashedPassword = passwordEncoderPort.encode(rawPassword);
-                user.setPassword(hashedPassword);
-                
+                boolean requiresActivation = false;
+
+                if (user.getDeletedAt() != null) {
+                    user.setDeletedAt(null);
+                    user.setDeletedBy(null);
+                    user.setStatus(org.offitec.osp.domain.enums.UserStatus.PENDING);
+                    String rawPassword = temporaryPasswordGeneratorPort.generate();
+                    String hashedPassword = passwordEncoderPort.encode(rawPassword);
+                    user.setPassword(hashedPassword);
+                    requiresActivation = true;
+                } else if (user.getStatus() != org.offitec.osp.domain.enums.UserStatus.ACTIVE) {
+                    requiresActivation = true;
+                }
+
                 userRepositoryPort.save(user);
                 
                 entityManager.createNativeQuery("INSERT INTO admin (id) VALUES (:id)")
                         .setParameter("id", user.getId())
                         .executeUpdate();
-                return;
+                return requiresActivation;
             }
         }
 
@@ -118,5 +133,6 @@ public class UserRegisterService {
                         .build();
 
         adminRepositoryPort.save(admin);
+        return true;
     }
 }

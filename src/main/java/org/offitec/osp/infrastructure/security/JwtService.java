@@ -66,7 +66,6 @@ public class JwtService implements TokenGeneratorPort {
 
         byte[] decodedAccountDeletionKey = Base64.getDecoder().decode(accountDeletionSecretKeyString);
         accountDeletionKey = Keys.hmacShaKeyFor(decodedAccountDeletionKey);
-
     }
 
     @Override

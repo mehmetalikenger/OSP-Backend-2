@@ -47,14 +47,14 @@ public class AuthenticationController {
 
         ResponseCookie accessCookie = ResponseCookie.from("accessToken", responseDTO.getAccessToken())
                 .httpOnly(true)
-                .secure(true)
+                .secure(false)
                 .sameSite(sameSite)
                 .path("/")
                 .build();
 
         ResponseCookie.ResponseCookieBuilder refreshCookieBuilder = ResponseCookie.from("refreshToken", responseDTO.getRefreshToken())
                 .httpOnly(true)
-                .secure(true)
+                .secure(false)
                 .sameSite(sameSite)
                 .path("/");
 
@@ -77,7 +77,7 @@ public class AuthenticationController {
     public ResponseEntity<Void> logout() {
         ResponseCookie accessCookie = ResponseCookie.from("accessToken", "")
                 .httpOnly(true)
-                .secure(true)
+                .secure(false)
                 .sameSite(sameSite)
                 .path("/")
                 .maxAge(0)
@@ -85,7 +85,7 @@ public class AuthenticationController {
 
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", "")
                 .httpOnly(true)
-                .secure(true)
+                .secure(false)
                 .sameSite(sameSite)
                 .path("/")
                 .maxAge(0)
@@ -104,14 +104,14 @@ public class AuthenticationController {
 
         ResponseCookie accessCookie = ResponseCookie.from("accessToken", authResponseData.accessToken())
                 .httpOnly(true)
-                .secure(true)
+                .secure(false)
                 .sameSite(sameSite)
                 .path("/")
                 .build();
 
         ResponseCookie.ResponseCookieBuilder refreshCookieBuilder = ResponseCookie.from("refreshToken", authResponseData.refreshToken())
                 .httpOnly(true)
-                .secure(true)
+                .secure(false)
                 .sameSite(sameSite)
                 .path("/");
 
