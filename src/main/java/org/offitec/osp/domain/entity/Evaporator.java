@@ -16,7 +16,7 @@ public class Evaporator {
     @SequenceGenerator(name = "evap_seq_gen", sequenceName = "osp_evap_sequence", allocationSize = 50)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private String brand;
 
     @Column(nullable = false)

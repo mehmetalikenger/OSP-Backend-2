@@ -16,7 +16,7 @@ public class ExpansionValve {
     @SequenceGenerator(name = "exp_valve_seq_gen", sequenceName = "osp_exp_valve_sequence", allocationSize = 50)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private String brand;
 
     @Column(nullable = false)

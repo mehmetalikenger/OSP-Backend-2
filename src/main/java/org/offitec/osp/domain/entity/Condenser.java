@@ -16,7 +16,7 @@ public class Condenser {
     @SequenceGenerator(name = "cond_seq_gen", sequenceName = "osp_cond_sequence", allocationSize = 50)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private String brand;
 
     @Column(nullable = false)

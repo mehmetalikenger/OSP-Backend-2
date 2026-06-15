@@ -16,7 +16,7 @@ public class FourWayReversingValve {
     @SequenceGenerator(name = "four_way_reversing_valve_seq_gen", sequenceName = "osp_four_way_reversing_valve_sequence", allocationSize = 50)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private String brand;
 
     @Column(nullable = false)

@@ -16,7 +16,7 @@ public class Chassis {
     @SequenceGenerator(name = "chassis_seq_gen", sequenceName = "osp_chassis_sequence", allocationSize = 50)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private String brand;
 
     @Column(nullable = false)

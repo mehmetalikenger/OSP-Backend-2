@@ -5,7 +5,9 @@ import lombok.*;
 import org.offitec.osp.domain.enums.CompressorKind;
 
 @Entity
-@Table(name = "compressor")
+@Table(name = "compressor", uniqueConstraints = {
+        @UniqueConstraint(name = "uc_compressor_model", columnNames = {"model"})
+})
 @Getter
 @Setter
 @NoArgsConstructor
