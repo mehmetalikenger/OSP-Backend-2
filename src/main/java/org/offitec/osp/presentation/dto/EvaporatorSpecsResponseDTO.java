@@ -3,6 +3,7 @@ package org.offitec.osp.presentation.dto;
 public class EvaporatorSpecsResponseDTO {
 
     private Long id;
+    private String brand;
     private String model;
     private double capacity;
 
@@ -12,6 +13,14 @@ public class EvaporatorSpecsResponseDTO {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public String getBrand() {
+        return brand;
+    }
+
+    public void setBrand(String brand) {
+        this.brand = brand;
     }
 
     public String getModel() {

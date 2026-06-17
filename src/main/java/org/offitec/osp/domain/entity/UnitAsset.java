@@ -5,21 +5,21 @@ import lombok.*;
 import org.offitec.osp.domain.enums.AssetType;
 
 @Entity
-@Table(name = "product_asset")
+@Table(name = "unit_asset")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class ProductAsset {
+public class UnitAsset {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "product_asset_seq_gen")
-    @SequenceGenerator(name = "product_asset_seq_gen", sequenceName = "osp_product_asset_sequence", allocationSize = 50)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "unit_asset_seq_gen")
+    @SequenceGenerator(name = "unit_asset_seq_gen", sequenceName = "osp_unit_asset_sequence", allocationSize = 50)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", nullable = false)
-    private Product product;
+    @JoinColumn(name = "unit_id", nullable = false)
+    private Unit unit;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "asset_type", nullable = false)

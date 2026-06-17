@@ -6,25 +6,25 @@ import org.offitec.osp.domain.enums.Mod;
 
 @Entity
 @Table(
-    name = "product_details",
+    name = "unit_details",
     uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"product_id", "mod"})
+        @UniqueConstraint(columnNames = {"unit_id", "mod"})
     }
 )
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class ProductDetails {
+public class UnitDetails{
 
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "product_details_seq_gen")
-    @SequenceGenerator(name = "product_details_seq_gen", sequenceName = "osp_product_details_sequence", allocationSize = 50)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "unit_details_seq_gen")
+    @SequenceGenerator(name = "unit_details_seq_gen", sequenceName = "osp_unit_details_sequence", allocationSize = 50)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", nullable = false)
-    private Product product;
+    @JoinColumn(name = "unit_id", nullable = false)
+    private Unit unit;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

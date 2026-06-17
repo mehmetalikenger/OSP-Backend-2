@@ -1,0 +1,53 @@
+package org.offitec.osp.presentation.dto;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class ChillerResponseDTO {
+
+    private Long id;
+    private String model;
+    private String type; // AW / WW
+    private String mod;  // COOLING / HEATING
+
+    // Calculation values
+    private double ambient;
+    private double condensation;
+    private double evaporation;
+    private double subcooling;
+    private double superheat;
+    private double evapIn;
+    private double evapOut;
+    private double condIn;
+    private double condOut;
+
+    // Technical specifications. Component selections are exposed as their *specs* ids
+    // so the frontend can preselect the matching dropdown option.
+    private double capacity;
+    private Long compressorSpecsId;
+    private int compressorQty;
+    private Long condenserSpecsId;
+    private int condenserQty;
+    private Long expansionValveSpecsId;
+    private int expansionValveQty;
+    private Long evaporatorSpecsId;
+    private Long chassisId;
+    private Long fourWayReversingValveSpecsId;
+    private Long refrigerantId;
+    private double condenserRequiredDuty;
+    private double quietCondenserRequiredDuty;
+    private double fanPI;
+    private double copErr;
+    private double width;
+    private double length;
+    private double height;
+    private int numberOfFans;
+    private double fanDiameter;
+    private double airflowRate;
+    private String dischargeLineDiameter;
+    private String liquidLineDiameter;
+    private String suctionLineDiameter;
+    private double gasTank;
+}

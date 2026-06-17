@@ -203,6 +203,7 @@ public class ComponentAppService {
             dto.setId(specs.getId());
             dto.setCapacity(specs.getCapacity());
             if (specs.getEvaporator() != null) {
+                dto.setBrand(specs.getEvaporator().getBrand());
                 dto.setModel(specs.getEvaporator().getModel());
             }
             return dto;
@@ -265,6 +266,7 @@ public class ComponentAppService {
             dto.setId(specs.getId());
             dto.setCapacity(specs.getCapacity());
             if (specs.getCondenser() != null) {
+                dto.setBrand(specs.getCondenser().getBrand());
                 dto.setModel(specs.getCondenser().getModel());
             }
             return dto;
@@ -327,6 +329,7 @@ public class ComponentAppService {
             dto.setId(specs.getId());
             dto.setCapacity(specs.getCapacity());
             if (specs.getExpansionValve() != null) {
+                dto.setBrand(specs.getExpansionValve().getBrand());
                 dto.setModel(specs.getExpansionValve().getModel());
             }
             return dto;
@@ -389,6 +392,7 @@ public class ComponentAppService {
             dto.setId(specs.getId());
             dto.setCapacity(specs.getCapacity());
             if (specs.getFourWayReversingValve() != null) {
+                dto.setBrand(specs.getFourWayReversingValve().getBrand());
                 dto.setModel(specs.getFourWayReversingValve().getModel());
             }
             return dto;
