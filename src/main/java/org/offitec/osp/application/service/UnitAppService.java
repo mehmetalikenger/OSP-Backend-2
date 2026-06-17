@@ -61,7 +61,7 @@ public class UnitAppService {
     // --- Create (chiller: shell + common + single cooling mode in one shot) ---
 
     @Transactional
-    public void addChiller(ChillerWrapperDTO dto) {
+    public Long addChiller(ChillerWrapperDTO dto) {
 
         ChillerDTO chillerDto = dto.getChillerDto();
         UnitTechSpecsDTO techDto = dto.getUnitTechSpecsDTO();
@@ -73,6 +73,8 @@ public class UnitAppService {
 
         Unit unit = new Unit();
         unit.setModel(chillerDto.getModel());
+        unit.setName(chillerDto.getName());
+        unit.setDescription(chillerDto.getDescription());
         unit.setCategory(UnitCategory.CHILLER);
         unit.setUnitType(unitType);
         applyCommonSpecs(unit, techDto);
@@ -93,16 +95,15 @@ public class UnitAppService {
 
         unitJpaRepository.save(unit);
 
-        saveAssets(chillerDto, unit);
+        return unit.getId();
     }
 
     // Uploads each file to its S3 bucket and records a UnitAsset row with the returned URL.
-    // The primary image's key ends with "_primary" so it can be told apart from the rest.
     private void saveAssets(ChillerDTO dto, Unit unit) {
 
         if (notEmpty(dto.getPrimaryImage())) {
-            String url = s3Service.uploadImage(buildKey(unit.getId(), dto.getPrimaryImage()) + "_primary", dto.getPrimaryImage());
-            persistAsset(unit, AssetType.IMAGE, url);
+            String url = s3Service.uploadImage(buildKey(unit.getId(), dto.getPrimaryImage()), dto.getPrimaryImage());
+            persistAsset(unit, AssetType.IMAGE, url, true);
         }
 
         uploadAll(dto.getImages(), unit, AssetType.IMAGE);
@@ -126,15 +127,16 @@ public class UnitAppService {
                 case ICON -> s3Service.uploadIcon(key, file);
                 case DOCUMENT -> s3Service.uploadDocument(key, file);
             };
-            persistAsset(unit, type, url);
+            persistAsset(unit, type, url, false);
         }
     }
 
-    private void persistAsset(Unit unit, AssetType type, String url) {
+    private void persistAsset(Unit unit, AssetType type, String url, boolean isPrimary) {
         UnitAsset asset = new UnitAsset();
         asset.setUnit(unit);
         asset.setAssetType(type);
         asset.setUrl(url);
+        asset.setPrimary(isPrimary);
         unitAssetRepository.save(asset);
     }
 
@@ -172,6 +174,8 @@ public class UnitAppService {
         ChillerResponseDTO r = new ChillerResponseDTO();
         r.setId(unit.getId());
         r.setModel(unit.getModel());
+        r.setName(unit.getName());
+        r.setDescription(unit.getDescription());
         r.setType(unit.getUnitType().name());
         r.setMod(details.getMod().name());
 
@@ -215,6 +219,19 @@ public class UnitAppService {
         r.setFourWayReversingValveSpecsId(ts.getFourWayReversingValveSpecs() != null ? ts.getFourWayReversingValveSpecs().getId() : null);
         r.setChassisId(ts.getChassis() != null ? ts.getChassis().getId() : null);
 
+        List<UnitAssetDTO> assets = unitAssetRepository.findByUnitId(id).stream()
+                .map(a -> {
+                    String signedUrl = switch (a.getAssetType()) {
+                        case IMAGE    -> s3Service.presignImage(a.getUrl());
+                        case DRAWING  -> s3Service.presignTechnicalImage(a.getUrl());
+                        case ICON     -> s3Service.presignIcon(a.getUrl());
+                        case DOCUMENT -> s3Service.presignDocument(a.getUrl());
+                    };
+                    return new UnitAssetDTO(a.getId(), signedUrl, a.getAssetType().name(), a.isPrimary());
+                })
+                .collect(Collectors.toList());
+        r.setAssets(assets);
+
         return r;
     }
 
@@ -235,6 +252,8 @@ public class UnitAppService {
         Mod mod = Mod.valueOf(chillerDto.getMod().trim().toUpperCase());
 
         unit.setModel(chillerDto.getModel());
+        unit.setName(chillerDto.getName());
+        unit.setDescription(chillerDto.getDescription());
         unit.setUnitType(unitType);
         applyCommonSpecs(unit, techDto);
 
@@ -251,7 +270,7 @@ public class UnitAppService {
     // --- Heat pump: shell (model + common tech), created without modes ---
 
     @Transactional
-    public void addHeatPump(HeatPumpModelWrapperDTO dto) {
+    public Long addHeatPump(HeatPumpModelWrapperDTO dto) {
 
         HeatPumpDTO hp = dto.getHeatPumpDto();
 
@@ -261,11 +280,35 @@ public class UnitAppService {
 
         Unit unit = new Unit();
         unit.setModel(hp.getModel());
+        unit.setName(hp.getName());
+        unit.setDescription(hp.getDescription());
         unit.setCategory(UnitCategory.HEAT_PUMP);
         unit.setUnitType(unitType);
         applyCommonSpecs(unit, dto.getCommonSpecsDto());
 
         unitJpaRepository.save(unit);
+        return unit.getId();
+    }
+
+    @Transactional
+    public void uploadAssets(Long unitId, AssetUploadDTO dto) {
+
+        Unit unit = unitJpaRepository.findById(unitId)
+                .orElseThrow(() -> new UnitDoesntExistException("Unit doesn't exist."));
+
+        if (notEmpty(dto.getPrimaryImage())) {
+            // Clear any existing primary image before setting the new one
+            unitAssetRepository.findByUnitId(unitId).stream()
+                    .filter(a -> a.getAssetType() == AssetType.IMAGE && a.isPrimary())
+                    .forEach(a -> { a.setPrimary(false); unitAssetRepository.save(a); });
+            String url = s3Service.uploadImage(buildKey(unitId, dto.getPrimaryImage()), dto.getPrimaryImage());
+            persistAsset(unit, AssetType.IMAGE, url, true);
+        }
+
+        uploadAll(dto.getImages(), unit, AssetType.IMAGE);
+        uploadAll(dto.getTechnicalImages(), unit, AssetType.DRAWING);
+        uploadAll(dto.getIcons(), unit, AssetType.ICON);
+        uploadAll(dto.getDocuments(), unit, AssetType.DOCUMENT);
     }
 
     // --- Heat pump: attach one mode's details to an existing heat pump ---
@@ -333,6 +376,8 @@ public class UnitAppService {
         HeatPumpResponseDTO r = new HeatPumpResponseDTO();
         r.setId(unit.getId());
         r.setModel(unit.getModel());
+        r.setName(unit.getName());
+        r.setDescription(unit.getDescription());
         r.setType(unit.getUnitType().name());
 
         r.setCompressorQty(unit.getCompressorQty());
@@ -383,6 +428,19 @@ public class UnitAppService {
         }
         r.setModes(modes);
 
+        List<UnitAssetDTO> assets = unitAssetRepository.findByUnitId(id).stream()
+                .map(a -> {
+                    String signedUrl = switch (a.getAssetType()) {
+                        case IMAGE    -> s3Service.presignImage(a.getUrl());
+                        case DRAWING  -> s3Service.presignTechnicalImage(a.getUrl());
+                        case ICON     -> s3Service.presignIcon(a.getUrl());
+                        case DOCUMENT -> s3Service.presignDocument(a.getUrl());
+                    };
+                    return new UnitAssetDTO(a.getId(), signedUrl, a.getAssetType().name(), a.isPrimary());
+                })
+                .collect(Collectors.toList());
+        r.setAssets(assets);
+
         return r;
     }
 
@@ -400,6 +458,8 @@ public class UnitAppService {
         unitDomainService.validateUniqueModelForEdit(hp.getModel(), id);
 
         unit.setModel(hp.getModel());
+        unit.setName(hp.getName());
+        unit.setDescription(hp.getDescription());
         unit.setUnitType(UnitTypeEnum.valueOf(hp.getType().trim().toUpperCase()));
         applyCommonSpecs(unit, dto.getCommonSpecsDto());
 
@@ -518,6 +578,41 @@ public class UnitAppService {
         } else {
             ts.setFourWayReversingValveSpecs(null);
         }
+    }
+
+    // --- Asset management ---
+
+    @Transactional
+    public void deleteAsset(Long assetId) {
+        UnitAsset asset = unitAssetRepository.findById(assetId)
+                .orElseThrow(() -> new RuntimeException("Asset not found: " + assetId));
+
+        switch (asset.getAssetType()) {
+            case IMAGE    -> s3Service.deleteImage(asset.getUrl());
+            case DRAWING  -> s3Service.deleteTechnicalImage(asset.getUrl());
+            case ICON     -> s3Service.deleteIcon(asset.getUrl());
+            case DOCUMENT -> s3Service.deleteDocument(asset.getUrl());
+        }
+
+        unitAssetRepository.delete(asset);
+    }
+
+    @Transactional
+    public void setPrimaryAsset(Long assetId) {
+        UnitAsset target = unitAssetRepository.findById(assetId)
+                .orElseThrow(() -> new RuntimeException("Asset not found: " + assetId));
+
+        if (target.getAssetType() != AssetType.IMAGE) {
+            throw new RuntimeException("Only IMAGE assets can be set as primary.");
+        }
+
+        Long unitId = target.getUnit().getId();
+        unitAssetRepository.findByUnitId(unitId).stream()
+                .filter(a -> a.getAssetType() == AssetType.IMAGE && a.isPrimary())
+                .forEach(a -> { a.setPrimary(false); unitAssetRepository.save(a); });
+
+        target.setPrimary(true);
+        unitAssetRepository.save(target);
     }
 
     void applyCalcValues(DefaultCalculationValues calcValues, UnitDefCalcValuesDTO calcDto) {

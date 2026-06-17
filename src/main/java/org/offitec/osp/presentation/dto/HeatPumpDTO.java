@@ -11,4 +11,7 @@ public class HeatPumpDTO {
 
     @NotBlank(message = "Unit type can't be blank.")
     public String type;
+
+    public String name;
+    public String description;
 }

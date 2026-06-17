@@ -21,4 +21,5 @@ public class UserProfileDTO {
     private org.offitec.osp.domain.enums.UserCategory category;
     private java.time.LocalDateTime createdAt;
     private org.offitec.osp.domain.enums.UserStatus status;
+    private String imageUrl;
 }

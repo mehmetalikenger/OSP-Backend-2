@@ -24,6 +24,9 @@ public class S3Service {
     @Value("${spring.storage.s3.unit-documents-bucket-name}")
     private String unitDocumentsBucket;
 
+    @Value("${spring.storage.s3.user-pictures-bucket-name}")
+    private String userPicturesBucket;
+
     private final AmazonS3 amazonS3;
 
     public S3Service(AmazonS3 amazonS3) {
@@ -44,6 +47,39 @@ public class S3Service {
 
     public String uploadDocument(String key, MultipartFile file) {
         return upload(unitDocumentsBucket, key, file);
+    }
+
+    public String uploadUserPicture(String key, MultipartFile file) { return upload(userPicturesBucket, key, file); }
+    public void deleteUserPicture(String url)    { delete(userPicturesBucket, url); }
+    public String presignUserPicture(String url) { return presign(userPicturesBucket, url); }
+
+    public void deleteImage(String url)          { delete(unitImagesBucket, url); }
+    public void deleteTechnicalImage(String url) { delete(unitTechnicalImagesBucket, url); }
+    public void deleteIcon(String url)           { delete(unitIconsBucket, url); }
+    public void deleteDocument(String url)       { delete(unitDocumentsBucket, url); }
+
+    public String presignImage(String url)          { return presign(unitImagesBucket, url); }
+    public String presignTechnicalImage(String url) { return presign(unitTechnicalImagesBucket, url); }
+    public String presignIcon(String url)           { return presign(unitIconsBucket, url); }
+    public String presignDocument(String url)       { return presign(unitDocumentsBucket, url); }
+
+    private String presign(String bucket, String url) {
+        try {
+            String key = new java.net.URI(url).getPath().substring(1);
+            java.util.Date expiration = new java.util.Date(System.currentTimeMillis() + 3_600_000L); // 1 h
+            return amazonS3.generatePresignedUrl(bucket, key, expiration).toString();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to generate pre-signed URL: " + url, e);
+        }
+    }
+
+    private void delete(String bucket, String url) {
+        try {
+            String key = new java.net.URI(url).getPath().substring(1);
+            amazonS3.deleteObject(bucket, key);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to delete S3 object: " + url, e);
+        }
     }
 
     // Streams the file straight to S3 (no temp file on disk) and returns the stored object URL.

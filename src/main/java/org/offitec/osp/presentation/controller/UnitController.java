@@ -5,6 +5,7 @@ import org.offitec.osp.application.service.UnitAppService;
 import org.offitec.osp.presentation.dto.ChillerResponseDTO;
 import org.offitec.osp.presentation.dto.ChillerSummaryDTO;
 import org.offitec.osp.presentation.dto.ChillerWrapperDTO;
+import org.offitec.osp.presentation.dto.AssetUploadDTO;
 import org.offitec.osp.presentation.dto.HeatPumpDetailsWrapperDTO;
 import org.offitec.osp.presentation.dto.HeatPumpModelWrapperDTO;
 import org.offitec.osp.presentation.dto.HeatPumpResponseDTO;
@@ -26,12 +27,9 @@ public class UnitController {
         this.unitAppService = unitAppService;
     }
 
-    @PostMapping(value = "/addChiller", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public HttpStatus addChiller(@Valid @ModelAttribute ChillerWrapperDTO dto){
-
-        unitAppService.addChiller(dto);
-
-        return HttpStatus.OK;
+    @PostMapping("/addChiller")
+    public ResponseEntity<Long> addChiller(@Valid @RequestBody ChillerWrapperDTO dto) {
+        return ResponseEntity.ok(unitAppService.addChiller(dto));
     }
 
     @GetMapping("/chillers")
@@ -55,10 +53,13 @@ public class UnitController {
     // --- Heat pump ---
 
     @PostMapping("/heat-pump")
-    public HttpStatus addHeatPump(@Valid @RequestBody HeatPumpModelWrapperDTO dto) {
+    public ResponseEntity<Long> addHeatPump(@Valid @RequestBody HeatPumpModelWrapperDTO dto) {
+        return ResponseEntity.ok(unitAppService.addHeatPump(dto));
+    }
 
-        unitAppService.addHeatPump(dto);
-
+    @PostMapping(value = "/{unitId}/upload-assets", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public HttpStatus uploadAssets(@PathVariable Long unitId, @ModelAttribute AssetUploadDTO dto) {
+        unitAppService.uploadAssets(unitId, dto);
         return HttpStatus.OK;
     }
 
@@ -93,6 +94,20 @@ public class UnitController {
 
         unitAppService.editHeatPumpDetails(dto);
 
+        return HttpStatus.OK;
+    }
+
+    // --- Asset management ---
+
+    @DeleteMapping("/asset/{assetId}")
+    public HttpStatus deleteAsset(@PathVariable Long assetId) {
+        unitAppService.deleteAsset(assetId);
+        return HttpStatus.OK;
+    }
+
+    @PutMapping("/asset/{assetId}/primary")
+    public HttpStatus setPrimaryAsset(@PathVariable Long assetId) {
+        unitAppService.setPrimaryAsset(assetId);
         return HttpStatus.OK;
     }
 }

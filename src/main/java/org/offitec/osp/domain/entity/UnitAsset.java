@@ -27,4 +27,7 @@ public class UnitAsset {
 
     @Column(nullable = false)
     private String url;
+
+    @Column(name = "is_primary", nullable = false)
+    private boolean isPrimary = false;
 }

@@ -5,19 +5,23 @@ import org.offitec.osp.domain.data.UserAddressData;
 import org.offitec.osp.domain.data.UserPasswordData;
 import org.offitec.osp.domain.data.UserUpdateData;
 import org.offitec.osp.domain.service.UserProfileService;
+import org.offitec.osp.infrastructure.storage.S3Service;
 import org.offitec.osp.presentation.dto.AdminUpdateDTO;
 import org.offitec.osp.presentation.dto.UserAddressDTO;
 import org.offitec.osp.presentation.dto.UserPasswordDTO;
 import org.offitec.osp.presentation.dto.UserUpdateDTO;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class UserProfileAppService {
 
     private final UserProfileService userProfileService;
+    private final S3Service s3Service;
 
-    public UserProfileAppService(UserProfileService userProfileService){
+    public UserProfileAppService(UserProfileService userProfileService, S3Service s3Service){
         this.userProfileService = userProfileService;
+        this.s3Service = s3Service;
     }
 
     public void updateUser(UserUpdateDTO dto){
@@ -69,6 +73,16 @@ public class UserProfileAppService {
     }
 
 
+    public void uploadProfilePicture(Long userId, MultipartFile file) {
+        org.offitec.osp.domain.entity.User user = userProfileService.getUserProfile(userId);
+        if (user.getImageUrl() != null) {
+            s3Service.deleteUserPicture(user.getImageUrl());
+        }
+        String key = userId + "-" + file.getOriginalFilename();
+        String url = s3Service.uploadUserPicture(key, file);
+        userProfileService.updateImageUrl(userId, url);
+    }
+
     public void softDeleteUser(Long id, String adminEmail) {
         userProfileService.softDeleteUser(id, adminEmail);
     }
@@ -82,6 +96,10 @@ public class UserProfileAppService {
         if (user instanceof org.offitec.osp.domain.entity.Admin admin) {
             surname = admin.getSurname();
         }
+        String signedImageUrl = null;
+        if (user.getImageUrl() != null) {
+            signedImageUrl = s3Service.presignUserPicture(user.getImageUrl());
+        }
         return new org.offitec.osp.presentation.dto.UserProfileDTO(
             user.getId(),
             user.getUsername(),
@@ -93,7 +111,8 @@ public class UserProfileAppService {
             surname,
             user.getCategory(),
             user.getCreatedAt(),
-            user.getStatus()
+            user.getStatus(),
+            signedImageUrl
         );
     }
 }

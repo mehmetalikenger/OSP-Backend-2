@@ -10,8 +10,12 @@ import java.util.List;
 @Setter
 public class HeatPumpResponseDTO {
 
+    private List<UnitAssetDTO> assets;
+
     private Long id;
     private String model;
+    private String name;
+    private String description;
     private String type; // AW / WW
 
     // common (unit-level)

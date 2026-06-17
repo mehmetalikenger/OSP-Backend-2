@@ -31,6 +31,11 @@ public class Unit {
     @Column(nullable = false)
     private String model;
 
+    private String name;
+
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "category", nullable = false)
     private UnitCategory category;
@@ -84,4 +89,7 @@ public class Unit {
 
     @OneToMany(mappedBy = "unit", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<UnitDetails> unitDetails;
+
+    @OneToMany(mappedBy = "unit", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<UnitAsset> assets;
 }

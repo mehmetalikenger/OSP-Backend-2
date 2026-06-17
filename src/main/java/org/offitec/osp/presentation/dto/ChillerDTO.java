@@ -14,6 +14,9 @@ public class ChillerDTO {
     @NotBlank(message = "Unit model can't be blank.")
     public String model;
 
+    public String name;
+    public String description;
+
     @NotBlank(message = "Unit type can't be blank.")
     public String type;
 

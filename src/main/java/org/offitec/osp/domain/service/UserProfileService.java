@@ -134,6 +134,14 @@ public class UserProfileService {
         userRepositoryPort.save(user);
     }
 
+    public void updateImageUrl(Long userId, String imageUrl) {
+        Optional<User> dbUser = userRepositoryPort.findById(userId);
+        if (dbUser.isEmpty()) throw new RuntimeException("User not found");
+        User user = dbUser.get();
+        user.setImageUrl(imageUrl);
+        userRepositoryPort.save(user);
+    }
+
     public void updateUserCategory(Long id, org.offitec.osp.domain.enums.UserCategory category) {
         Optional<User> dbUser = userRepositoryPort.findById(id);
         if(dbUser.isEmpty()){

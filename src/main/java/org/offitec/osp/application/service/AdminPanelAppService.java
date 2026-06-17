@@ -53,7 +53,8 @@ public class AdminPanelAppService {
             surname,
             user.getCategory(),
             user.getCreatedAt(),
-            user.getStatus()
+            user.getStatus(),
+            null
         );
     }
 }

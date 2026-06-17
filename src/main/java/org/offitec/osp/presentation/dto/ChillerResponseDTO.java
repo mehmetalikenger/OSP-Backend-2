@@ -3,12 +3,18 @@ package org.offitec.osp.presentation.dto;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.List;
+
 @Getter
 @Setter
 public class ChillerResponseDTO {
 
+    private List<UnitAssetDTO> assets;
+
     private Long id;
     private String model;
+    private String name;
+    private String description;
     private String type; // AW / WW
     private String mod;  // COOLING / HEATING
 
