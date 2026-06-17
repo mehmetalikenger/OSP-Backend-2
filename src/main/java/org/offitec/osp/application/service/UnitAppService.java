@@ -1,18 +1,22 @@
 package org.offitec.osp.application.service;
 
 import org.offitec.osp.domain.entity.*;
+import org.offitec.osp.domain.enums.AssetType;
 import org.offitec.osp.domain.enums.Mod;
 import org.offitec.osp.domain.enums.UnitCategory;
 import org.offitec.osp.domain.enums.UnitTypeEnum;
 import org.offitec.osp.domain.exception.*;
 import org.offitec.osp.domain.service.UnitDomainService;
 import org.offitec.osp.infrastructure.repository.*;
+import org.offitec.osp.infrastructure.storage.S3Service;
 import org.offitec.osp.presentation.dto.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,6 +31,8 @@ public class UnitAppService {
     private final FourWayReversingValveSpecsRepository fourWayReversingValveSpecsRepository;
     private final ChassisRepository chassisRepository;
     private final RefrigerantRepository refrigerantRepository;
+    private final UnitAssetRepository unitAssetRepository;
+    private final S3Service s3Service;
 
     public UnitAppService(UnitDomainService unitDomainService,
                           UnitJpaRepository unitJpaRepository,
@@ -36,7 +42,9 @@ public class UnitAppService {
                           ExpansionValveSpecsRepository expansionValveSpecsRepository,
                           FourWayReversingValveSpecsRepository fourWayReversingValveSpecsRepository,
                           ChassisRepository chassisRepository,
-                          RefrigerantRepository refrigerantRepository) {
+                          RefrigerantRepository refrigerantRepository,
+                          UnitAssetRepository unitAssetRepository,
+                          S3Service s3Service) {
         this.unitDomainService = unitDomainService;
         this.unitJpaRepository = unitJpaRepository;
         this.compressorSpecsRepository = compressorSpecsRepository;
@@ -46,6 +54,8 @@ public class UnitAppService {
         this.fourWayReversingValveSpecsRepository = fourWayReversingValveSpecsRepository;
         this.chassisRepository = chassisRepository;
         this.refrigerantRepository = refrigerantRepository;
+        this.unitAssetRepository = unitAssetRepository;
+        this.s3Service = s3Service;
     }
 
     // --- Create (chiller: shell + common + single cooling mode in one shot) ---
@@ -82,6 +92,60 @@ public class UnitAppService {
         unit.setUnitDetails(List.of(unitDetails));
 
         unitJpaRepository.save(unit);
+
+        saveAssets(chillerDto, unit);
+    }
+
+    // Uploads each file to its S3 bucket and records a UnitAsset row with the returned URL.
+    // The primary image's key ends with "_primary" so it can be told apart from the rest.
+    private void saveAssets(ChillerDTO dto, Unit unit) {
+
+        if (notEmpty(dto.getPrimaryImage())) {
+            String url = s3Service.uploadImage(buildKey(unit.getId(), dto.getPrimaryImage()) + "_primary", dto.getPrimaryImage());
+            persistAsset(unit, AssetType.IMAGE, url);
+        }
+
+        uploadAll(dto.getImages(), unit, AssetType.IMAGE);
+        uploadAll(dto.getTechnicalImages(), unit, AssetType.DRAWING);
+        uploadAll(dto.getIcons(), unit, AssetType.ICON);
+        uploadAll(dto.getDocuments(), unit, AssetType.DOCUMENT);
+    }
+
+    private void uploadAll(List<MultipartFile> files, Unit unit, AssetType type) {
+        if (files == null) {
+            return;
+        }
+        for (MultipartFile file : files) {
+            if (!notEmpty(file)) {
+                continue;
+            }
+            String key = buildKey(unit.getId(), file);
+            String url = switch (type) {
+                case IMAGE -> s3Service.uploadImage(key, file);
+                case DRAWING -> s3Service.uploadTechnicalImage(key, file);
+                case ICON -> s3Service.uploadIcon(key, file);
+                case DOCUMENT -> s3Service.uploadDocument(key, file);
+            };
+            persistAsset(unit, type, url);
+        }
+    }
+
+    private void persistAsset(Unit unit, AssetType type, String url) {
+        UnitAsset asset = new UnitAsset();
+        asset.setUnit(unit);
+        asset.setAssetType(type);
+        asset.setUrl(url);
+        unitAssetRepository.save(asset);
+    }
+
+    private boolean notEmpty(MultipartFile file) {
+        return file != null && !file.isEmpty();
+    }
+
+    private String buildKey(Long unitId, MultipartFile file) {
+        String name = file.getOriginalFilename();
+        name = (name == null || name.isBlank()) ? "file" : name.replaceAll("\\s+", "_");
+        return unitId + "/" + UUID.randomUUID() + "-" + name;
     }
 
     // --- Read ---
@@ -254,6 +318,112 @@ public class UnitAppService {
                         u.getUnitDetails() == null ? List.of()
                                 : u.getUnitDetails().stream().map(d -> d.getMod().name()).collect(Collectors.toList())))
                 .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public HeatPumpResponseDTO getHeatPump(Long id) {
+
+        Unit unit = unitJpaRepository.findById(id)
+                .orElseThrow(() -> new UnitDoesntExistException("Heat pump doesn't exist."));
+
+        if (unit.getCategory() != UnitCategory.HEAT_PUMP) {
+            throw new UnitDoesntExistException("Selected unit is not a heat pump.");
+        }
+
+        HeatPumpResponseDTO r = new HeatPumpResponseDTO();
+        r.setId(unit.getId());
+        r.setModel(unit.getModel());
+        r.setType(unit.getUnitType().name());
+
+        r.setCompressorQty(unit.getCompressorQty());
+        r.setCondenserQty(unit.getCondenserQty());
+        r.setExpansionValveQty(unit.getExpansionValveQty());
+        r.setRefrigerantId(unit.getRefrigerant() != null ? unit.getRefrigerant().getId() : null);
+        r.setFanPI(unit.getFanPI());
+        r.setWidth(unit.getWidth());
+        r.setLength(unit.getLength());
+        r.setHeight(unit.getHeight());
+        r.setNumberOfFans(unit.getNumberOfFans());
+        r.setFanDiameter(unit.getFanDiameter());
+        r.setAirflowRate(unit.getAirflowRate());
+        r.setDischargeLineDiameter(unit.getDischargeLineDiameter());
+        r.setLiquidLineDiameter(unit.getLiquidLineDiameter());
+        r.setSuctionLineDiameter(unit.getSuctionLineDiameter());
+        r.setGasTank(unit.getGasTank());
+
+        List<HeatPumpModeDTO> modes = new ArrayList<>();
+        if (unit.getUnitDetails() != null) {
+            for (UnitDetails d : unit.getUnitDetails()) {
+                TechSpecs ts = d.getTechSpecs();
+                DefaultCalculationValues cv = d.getDefCalcValues();
+
+                HeatPumpModeDTO m = new HeatPumpModeDTO();
+                m.setMod(d.getMod().name());
+                m.setCapacity(ts.getCapacity());
+                m.setCopErr(ts.getCopErr());
+                m.setCondenserRequiredDuty(ts.getCondenserRequiredDuty());
+                m.setQuietCondenserRequiredDuty(ts.getQuietCondenserRequiredDuty());
+                m.setCompressorSpecsId(ts.getCompressorSpecs() != null ? ts.getCompressorSpecs().getId() : null);
+                m.setCondenserSpecsId(ts.getCondenserSpecs() != null ? ts.getCondenserSpecs().getId() : null);
+                m.setEvaporatorSpecsId(ts.getEvaporatorSpecs() != null ? ts.getEvaporatorSpecs().getId() : null);
+                m.setExpansionValveSpecsId(ts.getExpansionValveSpecs() != null ? ts.getExpansionValveSpecs().getId() : null);
+                m.setFourWayReversingValveSpecsId(ts.getFourWayReversingValveSpecs() != null ? ts.getFourWayReversingValveSpecs().getId() : null);
+                m.setChassisId(ts.getChassis() != null ? ts.getChassis().getId() : null);
+                m.setAmbient(cv.getAmbient());
+                m.setCondensation(cv.getCondensation());
+                m.setEvaporation(cv.getEvaporation());
+                m.setSubcooling(cv.getSubcooling());
+                m.setSuperheat(cv.getSuperheat());
+                m.setEvapIn(cv.getEvapIn());
+                m.setEvapOut(cv.getEvapOut());
+                m.setCondIn(cv.getCondIn());
+                m.setCondOut(cv.getCondOut());
+                modes.add(m);
+            }
+        }
+        r.setModes(modes);
+
+        return r;
+    }
+
+    @Transactional
+    public void editHeatPump(Long id, HeatPumpModelWrapperDTO dto) {
+
+        Unit unit = unitJpaRepository.findById(id)
+                .orElseThrow(() -> new UnitDoesntExistException("Heat pump doesn't exist."));
+
+        if (unit.getCategory() != UnitCategory.HEAT_PUMP) {
+            throw new UnitDoesntExistException("Selected unit is not a heat pump.");
+        }
+
+        HeatPumpDTO hp = dto.getHeatPumpDto();
+        unitDomainService.validateUniqueModelForEdit(hp.getModel(), id);
+
+        unit.setModel(hp.getModel());
+        unit.setUnitType(UnitTypeEnum.valueOf(hp.getType().trim().toUpperCase()));
+        applyCommonSpecs(unit, dto.getCommonSpecsDto());
+
+        unitJpaRepository.save(unit);
+    }
+
+    @Transactional
+    public void editHeatPumpDetails(HeatPumpDetailsWrapperDTO dto) {
+
+        Unit unit = unitJpaRepository.findById(dto.getHeatPumpId())
+                .orElseThrow(() -> new UnitDoesntExistException("Heat pump doesn't exist."));
+
+        Mod mod = Mod.valueOf(dto.getMod().trim().toUpperCase());
+
+        UnitDetails details = unit.getUnitDetails() == null ? null
+                : unit.getUnitDetails().stream().filter(d -> d.getMod() == mod).findFirst().orElse(null);
+        if (details == null) {
+            throw new UnitDoesntExistException("This mode doesn't exist for the heat pump.");
+        }
+
+        applyModeSpecs(details.getTechSpecs(), dto.getModeSpecsDto());
+        applyCalcValues(details.getDefCalcValues(), dto.getUnitDefCalcValuesDTO());
+
+        unitJpaRepository.save(unit);
     }
 
     // --- Shared assembly ---

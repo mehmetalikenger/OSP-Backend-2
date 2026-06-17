@@ -1,4 +1,4 @@
-package org.offitec.osp.infrastructure;
+package org.offitec.osp.infrastructure.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;

@@ -7,16 +7,12 @@ import org.offitec.osp.presentation.dto.ChillerSummaryDTO;
 import org.offitec.osp.presentation.dto.ChillerWrapperDTO;
 import org.offitec.osp.presentation.dto.HeatPumpDetailsWrapperDTO;
 import org.offitec.osp.presentation.dto.HeatPumpModelWrapperDTO;
+import org.offitec.osp.presentation.dto.HeatPumpResponseDTO;
 import org.offitec.osp.presentation.dto.HeatPumpSummaryDTO;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -30,8 +26,8 @@ public class UnitController {
         this.unitAppService = unitAppService;
     }
 
-    @PostMapping("/addChiller")
-    public HttpStatus addChiller(@Valid @RequestBody ChillerWrapperDTO dto){
+    @PostMapping(value = "/addChiller", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public HttpStatus addChiller(@Valid @ModelAttribute ChillerWrapperDTO dto){
 
         unitAppService.addChiller(dto);
 
@@ -77,5 +73,26 @@ public class UnitController {
     @GetMapping("/heat-pumps")
     public ResponseEntity<List<HeatPumpSummaryDTO>> getAllHeatPumps() {
         return ResponseEntity.ok(unitAppService.getAllHeatPumps());
+    }
+
+    @GetMapping("/heat-pump/{id}")
+    public ResponseEntity<HeatPumpResponseDTO> getHeatPump(@PathVariable Long id) {
+        return ResponseEntity.ok(unitAppService.getHeatPump(id));
+    }
+
+    @PutMapping("/heat-pump/{id}")
+    public HttpStatus editHeatPump(@PathVariable Long id, @Valid @RequestBody HeatPumpModelWrapperDTO dto) {
+
+        unitAppService.editHeatPump(id, dto);
+
+        return HttpStatus.OK;
+    }
+
+    @PutMapping("/heat-pump/details")
+    public HttpStatus editHeatPumpDetails(@Valid @RequestBody HeatPumpDetailsWrapperDTO dto) {
+
+        unitAppService.editHeatPumpDetails(dto);
+
+        return HttpStatus.OK;
     }
 }

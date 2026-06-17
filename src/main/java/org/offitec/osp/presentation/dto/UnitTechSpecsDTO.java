@@ -2,8 +2,10 @@ package org.offitec.osp.presentation.dto;
 
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
+import lombok.Setter;
 
 @Getter
+@Setter
 public class UnitTechSpecsDTO {
 
     public double capacity;
