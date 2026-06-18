@@ -1,0 +1,11 @@
+server:
+  # Bind to the platform-assigned port (Railway sets PORT); fall back to 8080 locally.
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: osp
+  profiles:
+    # Selects which application-<profile>.yaml to load on top of this base file.
+    # Defaults to 'local'; override at runtime with SPRING_PROFILES_ACTIVE=prod (e.g. on Railway).
+    active: ${SPRING_PROFILES_ACTIVE:local}

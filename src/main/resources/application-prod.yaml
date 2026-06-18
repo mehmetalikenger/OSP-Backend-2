@@ -1,0 +1,46 @@
+server:
+  tomcat:
+    # Let Tomcat read/discard an over-limit upload so it returns a clean 413 instead of resetting the connection.
+    max-swallow-size: -1
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 25MB
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${PGUSER}
+    password: ${PGPASSWORD}
+  jpa:
+    hibernate:
+      # 'validate' never alters the prod schema — it only checks the entities match.
+      ddl-auto: validate
+      show-sql: false
+      dialect: PostgreSQLDialect
+  security:
+    jwt:
+      secret-key: ${JWT_SECRET_KEY}
+      account-activation-key: ${JWT_ACCOUNT_ACTIVATION_KEY}
+      reset-password-key: ${JWT_RESET_PASSWORD_KEY}
+      account-deletion-key: ${JWT_ACCOUNT_DELETION_KEY}
+      access-token-exp-time: 900
+      refresh-token-exp-time: 2592000
+      account-deletion-key-exp-time: 900
+      reset-password-key-exp-time: 900
+      same-site: ${SAME_SITE}
+  storage:
+    s3:
+      aws-access-key: ${AWS_ACCESS_KEY}
+      aws-secret-key: ${AWS_SECRET_KEY}
+      aws-region: eu-central-1
+      unit-images-bucket-name: s3-osp-unit-images
+      unit-technicalImages-bucket-name: s3-osp-unit-technical-images
+      unit-icons-bucket-name: s3-osp-unit-icons
+      unit-documents-bucket-name: s3-osp-unit-documents
+      user-pictures-bucket-name: s3-osp-user-profile-pictures
+
+app:
+  cors:
+    # Comma-separated list of frontend origins, e.g. https://app.example.com,https://www.example.com
+    allowed-origins: ${CORS_ALLOWED_ORIGINS}
