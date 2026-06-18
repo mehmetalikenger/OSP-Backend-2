@@ -1,5 +1,12 @@
 package org.offitec.osp.presentation.dto;
 
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Getter
+@Setter
+@NoArgsConstructor
 public class CompressorSpecsResponseDTO {
 
     private Long id;
@@ -9,51 +16,25 @@ public class CompressorSpecsResponseDTO {
     private double capacity;
     private double powerInput;
 
-    public Long getId() {
-        return id;
-    }
+    private double qC1;
+    private double qC2;
+    private double qC3;
+    private double qC4;
+    private double qC5;
+    private double qC6;
+    private double qC7;
+    private double qC8;
+    private double qC9;
+    private double qC10;
 
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getBrand() {
-        return brand;
-    }
-
-    public void setBrand(String brand) {
-        this.brand = brand;
-    }
-
-    public String getModel() {
-        return model;
-    }
-
-    public void setModel(String model) {
-        this.model = model;
-    }
-
-    public String getType() {
-        return type;
-    }
-
-    public void setType(String type) {
-        this.type = type;
-    }
-
-    public double getCapacity() {
-        return capacity;
-    }
-
-    public void setCapacity(double capacity) {
-        this.capacity = capacity;
-    }
-
-    public double getPowerInput() {
-        return powerInput;
-    }
-
-    public void setPowerInput(double powerInput) {
-        this.powerInput = powerInput;
-    }
+    private double pC1;
+    private double pC2;
+    private double pC3;
+    private double pC4;
+    private double pC5;
+    private double pC6;
+    private double pC7;
+    private double pC8;
+    private double pC9;
+    private double pC10;
 }

@@ -25,4 +25,26 @@ public class CompressorSpecs {
 
     @Column(name = "power_input", nullable = false)
     private double powerInput;
+
+    @Column(name = "q_c1", nullable = false) private double qC1;
+    @Column(name = "q_c2", nullable = false) private double qC2;
+    @Column(name = "q_c3", nullable = false) private double qC3;
+    @Column(name = "q_c4", nullable = false) private double qC4;
+    @Column(name = "q_c5", nullable = false) private double qC5;
+    @Column(name = "q_c6", nullable = false) private double qC6;
+    @Column(name = "q_c7", nullable = false) private double qC7;
+    @Column(name = "q_c8", nullable = false) private double qC8;
+    @Column(name = "q_c9", nullable = false) private double qC9;
+    @Column(name = "q_c10", nullable = false) private double qC10;
+
+    @Column(name = "p_c1", nullable = false) private double pC1;
+    @Column(name = "p_c2", nullable = false) private double pC2;
+    @Column(name = "p_c3", nullable = false) private double pC3;
+    @Column(name = "p_c4", nullable = false) private double pC4;
+    @Column(name = "p_c5", nullable = false) private double pC5;
+    @Column(name = "p_c6", nullable = false) private double pC6;
+    @Column(name = "p_c7", nullable = false) private double pC7;
+    @Column(name = "p_c8", nullable = false) private double pC8;
+    @Column(name = "p_c9", nullable = false) private double pC9;
+    @Column(name = "p_c10", nullable = false) private double pC10;
 }

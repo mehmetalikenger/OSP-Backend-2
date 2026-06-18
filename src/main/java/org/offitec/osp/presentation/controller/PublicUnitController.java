@@ -1,8 +1,11 @@
 package org.offitec.osp.presentation.controller;
 
+import jakarta.validation.Valid;
 import org.offitec.osp.application.service.PublicUnitAppService;
 import org.offitec.osp.domain.enums.UnitCategory;
 import org.offitec.osp.domain.enums.UnitTypeEnum;
+import org.offitec.osp.presentation.dto.CalculationRequestDTO;
+import org.offitec.osp.presentation.dto.CalculationResultDTO;
 import org.offitec.osp.presentation.dto.UnitCalcDataDTO;
 import org.offitec.osp.presentation.dto.UnitCardDTO;
 import org.offitec.osp.presentation.dto.UnitDetailPublicDTO;
@@ -48,6 +51,11 @@ public class PublicUnitController {
     public ResponseEntity<Map<String, Boolean>> toggleSave(@PathVariable Long id) {
         boolean nowSaved = service.toggleSave(id);
         return ResponseEntity.ok(Map.of("saved", nowSaved));
+    }
+
+    @PostMapping("/calculate")
+    public ResponseEntity<CalculationResultDTO> calculate(@Valid @RequestBody CalculationRequestDTO dto) {
+        return ResponseEntity.ok(service.calculate(dto));
     }
 
     @GetMapping("/saved")

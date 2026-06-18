@@ -78,6 +78,14 @@ public class ComponentAppService {
         specs.setCompressor(compressor);
         specs.setCapacity(dto.getCapacity());
         specs.setPowerInput(dto.getPowerInput());
+        specs.setQC1(dto.getQC1()); specs.setQC2(dto.getQC2()); specs.setQC3(dto.getQC3());
+        specs.setQC4(dto.getQC4()); specs.setQC5(dto.getQC5()); specs.setQC6(dto.getQC6());
+        specs.setQC7(dto.getQC7()); specs.setQC8(dto.getQC8()); specs.setQC9(dto.getQC9());
+        specs.setQC10(dto.getQC10());
+        specs.setPC1(dto.getPC1()); specs.setPC2(dto.getPC2()); specs.setPC3(dto.getPC3());
+        specs.setPC4(dto.getPC4()); specs.setPC5(dto.getPC5()); specs.setPC6(dto.getPC6());
+        specs.setPC7(dto.getPC7()); specs.setPC8(dto.getPC8()); specs.setPC9(dto.getPC9());
+        specs.setPC10(dto.getPC10());
 
         compressorSpecsRepository.save(specs);
     }
@@ -113,6 +121,14 @@ public class ComponentAppService {
         CompressorSpecs specs = dbSpecs.get();
         specs.setCapacity(dto.getCapacity());
         specs.setPowerInput(dto.getPowerInput());
+        specs.setQC1(dto.getQC1()); specs.setQC2(dto.getQC2()); specs.setQC3(dto.getQC3());
+        specs.setQC4(dto.getQC4()); specs.setQC5(dto.getQC5()); specs.setQC6(dto.getQC6());
+        specs.setQC7(dto.getQC7()); specs.setQC8(dto.getQC8()); specs.setQC9(dto.getQC9());
+        specs.setQC10(dto.getQC10());
+        specs.setPC1(dto.getPC1()); specs.setPC2(dto.getPC2()); specs.setPC3(dto.getPC3());
+        specs.setPC4(dto.getPC4()); specs.setPC5(dto.getPC5()); specs.setPC6(dto.getPC6());
+        specs.setPC7(dto.getPC7()); specs.setPC8(dto.getPC8()); specs.setPC9(dto.getPC9());
+        specs.setPC10(dto.getPC10());
 
         compressorSpecsRepository.save(specs);
     }
@@ -128,6 +144,14 @@ public class ComponentAppService {
                 dto.setModel(specs.getCompressor().getModel());
                 dto.setType(specs.getCompressor().getType().name());
             }
+            dto.setQC1(specs.getQC1()); dto.setQC2(specs.getQC2()); dto.setQC3(specs.getQC3());
+            dto.setQC4(specs.getQC4()); dto.setQC5(specs.getQC5()); dto.setQC6(specs.getQC6());
+            dto.setQC7(specs.getQC7()); dto.setQC8(specs.getQC8()); dto.setQC9(specs.getQC9());
+            dto.setQC10(specs.getQC10());
+            dto.setPC1(specs.getPC1()); dto.setPC2(specs.getPC2()); dto.setPC3(specs.getPC3());
+            dto.setPC4(specs.getPC4()); dto.setPC5(specs.getPC5()); dto.setPC6(specs.getPC6());
+            dto.setPC7(specs.getPC7()); dto.setPC8(specs.getPC8()); dto.setPC9(specs.getPC9());
+            dto.setPC10(specs.getPC10());
             return dto;
         }).collect(Collectors.toList());
     }

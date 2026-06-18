@@ -6,11 +6,16 @@ import org.offitec.osp.domain.enums.Mod;
 import org.offitec.osp.domain.enums.UnitCategory;
 import org.offitec.osp.domain.enums.UnitTypeEnum;
 import org.offitec.osp.domain.exception.UnitDoesntExistException;
+import org.offitec.osp.infrastructure.repository.CalculationOutputValuesRepository;
+import org.offitec.osp.infrastructure.repository.CustomCalculationValuesRepository;
 import org.offitec.osp.infrastructure.repository.SavedUnitRepository;
+import org.offitec.osp.infrastructure.repository.UnitDetailsRepository;
 import org.offitec.osp.infrastructure.repository.UnitJpaRepository;
 import org.offitec.osp.infrastructure.repository.UserRepository;
 import org.offitec.osp.infrastructure.storage.S3Service;
 import org.offitec.osp.presentation.dto.CalcAssetDTO;
+import org.offitec.osp.presentation.dto.CalculationRequestDTO;
+import org.offitec.osp.presentation.dto.CalculationResultDTO;
 import org.offitec.osp.presentation.dto.DefCalcValuesPublicDTO;
 import org.offitec.osp.presentation.dto.TechSpecItemDTO;
 import org.offitec.osp.presentation.dto.UnitCalcDataDTO;
@@ -30,15 +35,24 @@ import java.util.stream.Collectors;
 public class PublicUnitAppService {
 
     private final UnitJpaRepository unitJpaRepository;
+    private final UnitDetailsRepository unitDetailsRepository;
+    private final CustomCalculationValuesRepository customCalcValsRepository;
+    private final CalculationOutputValuesRepository calcOutputValsRepository;
     private final SavedUnitRepository savedUnitRepository;
     private final UserRepository userRepository;
     private final S3Service s3Service;
 
     public PublicUnitAppService(UnitJpaRepository unitJpaRepository,
+                                UnitDetailsRepository unitDetailsRepository,
+                                CustomCalculationValuesRepository customCalcValsRepository,
+                                CalculationOutputValuesRepository calcOutputValsRepository,
                                 SavedUnitRepository savedUnitRepository,
                                 UserRepository userRepository,
                                 S3Service s3Service) {
         this.unitJpaRepository = unitJpaRepository;
+        this.unitDetailsRepository = unitDetailsRepository;
+        this.customCalcValsRepository = customCalcValsRepository;
+        this.calcOutputValsRepository = calcOutputValsRepository;
         this.savedUnitRepository = savedUnitRepository;
         this.userRepository = userRepository;
         this.s3Service = s3Service;
@@ -131,8 +145,7 @@ public class PublicUnitAppService {
                 DefaultCalculationValues dcv = d.getDefCalcValues();
                 if (dcv == null) continue;
                 DefCalcValuesPublicDTO dto = new DefCalcValuesPublicDTO(
-                        dcv.getAmbient(), dcv.getCondensation(), dcv.getEvaporation(),
-                        dcv.getSubcooling(), dcv.getSuperheat(),
+                        dcv.getAmbient(),
                         dcv.getEvapIn(), dcv.getEvapOut(), dcv.getCondIn(), dcv.getCondOut()
                 );
                 if (d.getMod() == Mod.COOLING) coolingDefaults = dto;
@@ -151,6 +164,77 @@ public class PublicUnitAppService {
                 coolingDefaults,
                 heatingDefaults
         );
+    }
+
+    // --- Calculation ---
+
+    @Transactional
+    public CalculationResultDTO calculate(CalculationRequestDTO dto) {
+        Unit unit = unitJpaRepository.findById(dto.getUnitId())
+                .orElseThrow(() -> new UnitDoesntExistException("Unit not found."));
+
+        Mod mod = Mod.valueOf(dto.getMod().trim().toUpperCase());
+
+        UnitDetails details = unitDetailsRepository.findByUnitIdAndMod(dto.getUnitId(), mod)
+                .orElseThrow(() -> new RuntimeException("Unit details not found for mod: " + mod));
+
+        TechSpecs techSpecs = details.getTechSpecs();
+        if (techSpecs == null) throw new RuntimeException("Tech specs not configured for this unit.");
+
+        CompressorSpecs specs = techSpecs.getCompressorSpecs();
+        if (specs == null) throw new RuntimeException("Compressor specs not configured for this unit.");
+
+        double S = dto.getEvapOut() - 5;
+        double D = dto.getAmbient() + 15;
+
+        double q = evalPolynomial(S, D,
+                specs.getQC1(), specs.getQC2(), specs.getQC3(), specs.getQC4(), specs.getQC5(),
+                specs.getQC6(), specs.getQC7(), specs.getQC8(), specs.getQC9(), specs.getQC10());
+
+        double p = evalPolynomial(S, D,
+                specs.getPC1(), specs.getPC2(), specs.getPC3(), specs.getPC4(), specs.getPC5(),
+                specs.getPC6(), specs.getPC7(), specs.getPC8(), specs.getPC9(), specs.getPC10());
+
+        double totalQ = q * unit.getCompressorQty();
+        double totalP = p * unit.getCompressorQty();
+        double cop = totalP > 0 ? totalQ / totalP : 0;
+        double copEer = mod == Mod.COOLING ? cop * 3.412 : cop;
+
+        CustomCalculationValues customVals = new CustomCalculationValues(
+                null,
+                dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(), dto.getCondIn(), dto.getCondOut()
+        );
+        customVals = customCalcValsRepository.save(customVals);
+
+        CalculationOutputValues outputVals = new CalculationOutputValues(
+                null,
+                totalQ,
+                totalQ,
+                totalP,
+                totalQ + totalP,
+                0,
+                copEer,
+                0,
+                0
+        );
+        outputVals = calcOutputValsRepository.save(outputVals);
+
+        return new CalculationResultDTO(totalQ, totalP, copEer, customVals.getId(), outputVals.getId());
+    }
+
+    private double evalPolynomial(double S, double D,
+            double c1, double c2, double c3, double c4, double c5,
+            double c6, double c7, double c8, double c9, double c10) {
+        return c1
+                + c2 * S
+                + c3 * D
+                + c4 * S * S
+                + c5 * S * D
+                + c6 * D * D
+                + c7 * S * S * S
+                + c8 * D * S * S
+                + c9 * S * D * D
+                + c10 * D * D * D;
     }
 
     private String extractFileName(String url) {

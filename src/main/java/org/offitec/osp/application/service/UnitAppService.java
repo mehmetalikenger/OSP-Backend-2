@@ -181,10 +181,6 @@ public class UnitAppService {
 
         // calc values
         r.setAmbient(cv.getAmbient());
-        r.setCondensation(cv.getCondensation());
-        r.setEvaporation(cv.getEvaporation());
-        r.setSubcooling(cv.getSubcooling());
-        r.setSuperheat(cv.getSuperheat());
         r.setEvapIn(cv.getEvapIn());
         r.setEvapOut(cv.getEvapOut());
         r.setCondIn(cv.getCondIn());
@@ -415,10 +411,6 @@ public class UnitAppService {
                 m.setFourWayReversingValveSpecsId(ts.getFourWayReversingValveSpecs() != null ? ts.getFourWayReversingValveSpecs().getId() : null);
                 m.setChassisId(ts.getChassis() != null ? ts.getChassis().getId() : null);
                 m.setAmbient(cv.getAmbient());
-                m.setCondensation(cv.getCondensation());
-                m.setEvaporation(cv.getEvaporation());
-                m.setSubcooling(cv.getSubcooling());
-                m.setSuperheat(cv.getSuperheat());
                 m.setEvapIn(cv.getEvapIn());
                 m.setEvapOut(cv.getEvapOut());
                 m.setCondIn(cv.getCondIn());
@@ -617,10 +609,6 @@ public class UnitAppService {
 
     void applyCalcValues(DefaultCalculationValues calcValues, UnitDefCalcValuesDTO calcDto) {
         calcValues.setAmbient(calcDto.getAmbient());
-        calcValues.setCondensation(calcDto.getCondensation());
-        calcValues.setEvaporation(calcDto.getEvaporation());
-        calcValues.setSubcooling(calcDto.getSubcooling());
-        calcValues.setSuperheat(calcDto.getSuperheat());
         calcValues.setEvapIn(calcDto.getEvapIn());
         calcValues.setEvapOut(calcDto.getEvapOut());
         calcValues.setCondIn(calcDto.getCondIn());

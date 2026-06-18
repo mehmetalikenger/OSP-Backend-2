@@ -22,18 +22,6 @@ public class DefaultCalculationValues {
     private double ambient;
 
     @Column(nullable = false)
-    private double condensation;
-
-    @Column(nullable = false)
-    private double evaporation;
-
-    @Column(nullable = false)
-    private double subcooling;
-
-    @Column(nullable = false)
-    private double superheat;
-
-    @Column(nullable = false)
     private double evapIn;
 
     @Column(nullable = false)

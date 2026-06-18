@@ -20,10 +20,6 @@ public class ChillerResponseDTO {
 
     // Calculation values
     private double ambient;
-    private double condensation;
-    private double evaporation;
-    private double subcooling;
-    private double superheat;
     private double evapIn;
     private double evapOut;
     private double condIn;
