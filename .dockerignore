@@ -1,0 +1,7 @@
+# Keep the build context small and never ship local secrets/artifacts.
+target/
+.git
+.idea
+*.iml
+HELP.md
+src/main/resources/application-local.yaml
