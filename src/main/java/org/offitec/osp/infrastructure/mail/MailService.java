@@ -98,7 +98,7 @@ public class MailService {
             "<body>" +
             "    <div class=\"container\">" +
             "        <div class=\"header\">" +
-            "            <img src=\"%s/logo/logo-1-v1.png\" alt=\"OSP Logo\" />" +
+            "            <img src=\"%s/logo/logo-1-v1.png\" alt=\"OSP Logo\" width=\"180\" style=\"width:180px; max-width:180px; height:auto; display:block; margin:0 auto; border:0;\" />" +
             "        </div>" +
             "        <div class=\"content\">" +
             "            <h2>%s</h2>" +
@@ -107,7 +107,7 @@ public class MailService {
             "            <p class=\"raw-url\">Or copy and paste this link into your browser:<br/><a href=\"%s\">%s</a></p>" +
             "        </div>" +
             "        <div class=\"footer\">" +
-            "            <img src=\"%s/logo/logo.png\" alt=\"OffiTec Logo\" />" +
+            "            <img src=\"%s/logo/logo.png\" alt=\"OffiTec Logo\" width=\"120\" style=\"width:120px; max-width:120px; height:auto; display:block; margin:0 auto; border:0;\" />" +
             "            <p><strong>OSP</strong> (OffiTec Selection Software)</p>" +
             "            <p>&copy; OffiTec. All rights reserved.</p>" +
             "        </div>" +
