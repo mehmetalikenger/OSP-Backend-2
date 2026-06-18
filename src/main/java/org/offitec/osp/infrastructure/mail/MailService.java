@@ -14,16 +14,23 @@ public class MailService {
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
+    // Mailgun messages endpoint, e.g. https://api.eu.mailgun.net/v3/mail.osp.offitec.ch/messages
+    @Value("${mailgun.messages-url}")
+    private String mailgunMessagesUrl;
+
+    // Mailgun private sending key (secret — injected from env in prod).
+    @Value("${mailgun.api-key}")
+    private String mailgunApiKey;
+
+    // Sender shown on outgoing mail, e.g. OSP Support <no-reply@mail.osp.offitec.ch>
+    @Value("${mail.from}")
+    private String mailFrom;
+
     public JsonNode sendActivationEmail(String email, String token) throws UnirestException {
     
-        String apiKey = System.getenv("API_KEY");
-        if (apiKey == null) {
-            apiKey = "***REMOVED***";
-        }
-
-        HttpResponse<JsonNode> request = Unirest.post("https://api.mailgun.net/v3/pinextra.com/messages")
-                .basicAuth("api", apiKey)
-                .queryString("from", "OSP Support <no-reply@pinextra.com>")
+        HttpResponse<JsonNode> request = Unirest.post(mailgunMessagesUrl)
+                .basicAuth("api", mailgunApiKey)
+                .queryString("from", mailFrom)
                 .queryString("to", email)
                 .queryString("subject", "Account Activation")
                 .queryString("text", "Please activate your account by clicking the following link: " + frontendUrl + "/activate?token=" + token)
@@ -36,14 +43,9 @@ public class MailService {
     }
 
     public JsonNode sendForgotPasswordEmail(String email, String token) throws UnirestException {
-        String apiKey = System.getenv("API_KEY");
-        if (apiKey == null) {
-            apiKey = "***REMOVED***";
-        }
-
-        HttpResponse<JsonNode> request = Unirest.post("https://api.mailgun.net/v3/pinextra.com/messages")
-                .basicAuth("api", apiKey)
-                .queryString("from", "OSP Support <no-reply@pinextra.com>")
+        HttpResponse<JsonNode> request = Unirest.post(mailgunMessagesUrl)
+                .basicAuth("api", mailgunApiKey)
+                .queryString("from", mailFrom)
                 .queryString("to", email)
                 .queryString("subject", "Forgot Password")
                 .queryString("text", "You requested a password reset. Please click the following link to reset your password: " + frontendUrl + "/reset-password?token=" + token)
@@ -57,14 +59,9 @@ public class MailService {
 
     public JsonNode sendAccountDeletionConfirmationEmail(String email, String token) throws UnirestException {
     
-        String apiKey = System.getenv("API_KEY");
-        if (apiKey == null) {
-            apiKey = "***REMOVED***";
-        }
-
-        HttpResponse<JsonNode> request = Unirest.post("https://api.mailgun.net/v3/pinextra.com/messages")
-                .basicAuth("api", apiKey)
-                .queryString("from", "OSP Support <no-reply@pinextra.com>")
+        HttpResponse<JsonNode> request = Unirest.post(mailgunMessagesUrl)
+                .basicAuth("api", mailgunApiKey)
+                .queryString("from", mailFrom)
                 .queryString("to", email)
                 .queryString("subject", "Delete Account")
                 .queryString("text", "You requested to delete your account. Please click the following link to confirm: " + frontendUrl + "/delete-account?token=" + token)

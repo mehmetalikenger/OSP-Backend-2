@@ -9,3 +9,9 @@ spring:
     # Selects which application-<profile>.yaml to load on top of this base file.
     # Defaults to 'local'; override at runtime with SPRING_PROFILES_ACTIVE=prod (e.g. on Railway).
     active: ${SPRING_PROFILES_ACTIVE:local}
+
+# Mailgun config shared by all profiles (non-secret). The API key is per-profile.
+mailgun:
+  messages-url: https://api.eu.mailgun.net/v3/mail.osp.offitec.ch/messages
+mail:
+  from: "OSP Support <no-reply@mail.osp.offitec.ch>"

@@ -40,6 +40,9 @@ spring:
       unit-documents-bucket-name: s3-osp-unit-documents
       user-pictures-bucket-name: s3-osp-user-profile-pictures
 
+mailgun:
+  api-key: ${MAILGUN_API_KEY}
+
 app:
   frontend:
     # Base URL used to build links in emails (activation, password reset, etc.). No trailing slash.
