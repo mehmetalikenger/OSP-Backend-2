@@ -41,6 +41,9 @@ spring:
       user-pictures-bucket-name: s3-osp-user-profile-pictures
 
 app:
+  frontend:
+    # Base URL used to build links in emails (activation, password reset, etc.). No trailing slash.
+    url: ${FRONTEND_URL}
   cors:
     # Comma-separated list of frontend origins, e.g. https://app.example.com,https://www.example.com
     allowed-origins: ${CORS_ALLOWED_ORIGINS}

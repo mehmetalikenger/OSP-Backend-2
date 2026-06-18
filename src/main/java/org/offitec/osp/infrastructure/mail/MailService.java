@@ -1,5 +1,6 @@
 package org.offitec.osp.infrastructure.mail;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import com.mashape.unirest.http.JsonNode;
 import com.mashape.unirest.http.Unirest;
@@ -8,6 +9,10 @@ import com.mashape.unirest.http.HttpResponse;
 
 @Component
 public class MailService {
+
+    // Base URL of the frontend the email links point to (e.g. https://app.example.com).
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
 
     public JsonNode sendActivationEmail(String email, String token) throws UnirestException {
     
@@ -21,8 +26,8 @@ public class MailService {
                 .queryString("from", "OSP Support <no-reply@pinextra.com>")
                 .queryString("to", email)
                 .queryString("subject", "Account Activation")
-                .queryString("text", "Please activate your account by clicking the following link: http://192.168.10.12:3000/activate?token=" + token)
-                .queryString("html", buildHtmlTemplate("Account Activation", "Welcome to OSP! Please activate your account by clicking the button below:", "http://192.168.10.12:3000/activate?token=" + token, "Activate Account"))
+                .queryString("text", "Please activate your account by clicking the following link: " + frontendUrl + "/activate?token=" + token)
+                .queryString("html", buildHtmlTemplate("Account Activation", "Welcome to OSP! Please activate your account by clicking the button below:", frontendUrl + "/activate?token=" + token, "Activate Account"))
                 .asJson();
 
 
@@ -41,8 +46,8 @@ public class MailService {
                 .queryString("from", "OSP Support <no-reply@pinextra.com>")
                 .queryString("to", email)
                 .queryString("subject", "Forgot Password")
-                .queryString("text", "You requested a password reset. Please click the following link to reset your password: http://192.168.10.12:3000/reset-password?token=" + token)
-                .queryString("html", buildHtmlTemplate("Reset Password", "You requested a password reset. Please click the button below to reset your password:", "http://192.168.10.12:3000/reset-password?token=" + token, "Reset Password"))
+                .queryString("text", "You requested a password reset. Please click the following link to reset your password: " + frontendUrl + "/reset-password?token=" + token)
+                .queryString("html", buildHtmlTemplate("Reset Password", "You requested a password reset. Please click the button below to reset your password:", frontendUrl + "/reset-password?token=" + token, "Reset Password"))
                 .asJson();
 
 
@@ -62,8 +67,8 @@ public class MailService {
                 .queryString("from", "OSP Support <no-reply@pinextra.com>")
                 .queryString("to", email)
                 .queryString("subject", "Delete Account")
-                .queryString("text", "You requested to delete your account. Please click the following link to confirm: http://192.168.10.12:3000/delete-account?token=" + token)
-                .queryString("html", buildHtmlTemplate("Delete Account", "You requested to delete your account. Please click the button below to confirm this action. This cannot be undone.", "http://192.168.10.12:3000/delete-account?token=" + token, "Confirm Deletion"))
+                .queryString("text", "You requested to delete your account. Please click the following link to confirm: " + frontendUrl + "/delete-account?token=" + token)
+                .queryString("html", buildHtmlTemplate("Delete Account", "You requested to delete your account. Please click the button below to confirm this action. This cannot be undone.", frontendUrl + "/delete-account?token=" + token, "Confirm Deletion"))
                 .asJson();
 
 
@@ -72,7 +77,7 @@ public class MailService {
     }
 
     private String buildHtmlTemplate(String title, String message, String actionUrl, String actionText) {
-        String baseUrl = "http://192.168.10.12:3000";
+        String baseUrl = frontendUrl;
         return String.format(
             "<!DOCTYPE html>" +
             "<html>" +
