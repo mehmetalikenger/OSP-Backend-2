@@ -47,14 +47,14 @@ public class AuthenticationController {
 
         ResponseCookie accessCookie = ResponseCookie.from("accessToken", responseDTO.getAccessToken())
                 .httpOnly(true)
-                .secure(true)
+                .secure(false)
                 .sameSite(sameSite)
                 .path("/")
                 .build();
 
         ResponseCookie.ResponseCookieBuilder refreshCookieBuilder = ResponseCookie.from("refreshToken", responseDTO.getRefreshToken())
                 .httpOnly(true)
-                .secure(true)
+                .secure(false)
                 .sameSite(sameSite)
                 .path("/");
 
