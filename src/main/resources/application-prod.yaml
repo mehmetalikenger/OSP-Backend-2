@@ -14,8 +14,7 @@ spring:
     password: ${PGPASSWORD}
   jpa:
     hibernate:
-      # 'validate' never alters the prod schema — it only checks the entities match.
-      ddl-auto: validate
+      ddl-auto: ${DDL_AUTO:validate}
       show-sql: false
       dialect: PostgreSQLDialect
   security:
