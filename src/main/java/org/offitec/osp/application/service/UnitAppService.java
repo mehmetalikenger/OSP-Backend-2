@@ -7,6 +7,8 @@ import org.offitec.osp.domain.enums.UnitCategory;
 import org.offitec.osp.domain.enums.UnitTypeEnum;
 import org.offitec.osp.domain.exception.*;
 import org.offitec.osp.domain.service.UnitDomainService;
+import org.offitec.osp.domain.service.AuditLogService;
+import org.offitec.osp.domain.port.UserRepositoryPort;
 import org.offitec.osp.infrastructure.repository.*;
 import org.offitec.osp.infrastructure.storage.S3Service;
 import org.offitec.osp.presentation.dto.*;
@@ -33,6 +35,8 @@ public class UnitAppService {
     private final RefrigerantRepository refrigerantRepository;
     private final UnitAssetRepository unitAssetRepository;
     private final S3Service s3Service;
+    private final AuditLogService auditLogService;
+    private final UserRepositoryPort userRepositoryPort;
 
     public UnitAppService(UnitDomainService unitDomainService,
                           UnitJpaRepository unitJpaRepository,
@@ -44,7 +48,9 @@ public class UnitAppService {
                           ChassisRepository chassisRepository,
                           RefrigerantRepository refrigerantRepository,
                           UnitAssetRepository unitAssetRepository,
-                          S3Service s3Service) {
+                          S3Service s3Service,
+                          AuditLogService auditLogService,
+                          UserRepositoryPort userRepositoryPort) {
         this.unitDomainService = unitDomainService;
         this.unitJpaRepository = unitJpaRepository;
         this.compressorSpecsRepository = compressorSpecsRepository;
@@ -56,6 +62,8 @@ public class UnitAppService {
         this.refrigerantRepository = refrigerantRepository;
         this.unitAssetRepository = unitAssetRepository;
         this.s3Service = s3Service;
+        this.auditLogService = auditLogService;
+        this.userRepositoryPort = userRepositoryPort;
     }
 
     // --- Create (chiller: shell + common + single cooling mode in one shot) ---
@@ -155,6 +163,7 @@ public class UnitAppService {
     @Transactional(readOnly = true)
     public List<ChillerSummaryDTO> getAllChillers() {
         return unitJpaRepository.findByCategory(UnitCategory.CHILLER).stream()
+                .filter(u -> !u.isDeleted())
                 .map(u -> new ChillerSummaryDTO(u.getId(), u.getModel(), u.getUnitType().name()))
                 .collect(Collectors.toList());
     }
@@ -350,6 +359,7 @@ public class UnitAppService {
     @Transactional(readOnly = true)
     public List<HeatPumpSummaryDTO> getAllHeatPumps() {
         return unitJpaRepository.findByCategory(UnitCategory.HEAT_PUMP).stream()
+                .filter(u -> !u.isDeleted())
                 .map(u -> new HeatPumpSummaryDTO(
                         u.getId(),
                         u.getModel(),
@@ -605,6 +615,20 @@ public class UnitAppService {
 
         target.setPrimary(true);
         unitAssetRepository.save(target);
+    }
+
+    // Soft-delete a unit: kept in the DB (saved-units / projects still reference it),
+    // hidden from all listings, and recorded in the audit log.
+    @Transactional
+    public void deleteUnit(Long id, String adminEmail) {
+        Unit unit = unitJpaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Unit not found: " + id));
+        unit.setDeleted(true);
+        unitJpaRepository.save(unit);
+        Long adminId = adminEmail == null ? -1L
+                : userRepositoryPort.findByEmail(adminEmail).map(User::getId).orElse(-1L);
+        auditLogService.logAdminAction(adminId, "DELETE", "UNIT", id,
+                "Deleted unit " + unit.getModel() + " (" + unit.getCategory().name() + ")");
     }
 
     void applyCalcValues(DefaultCalculationValues calcValues, UnitDefCalcValuesDTO calcDto) {

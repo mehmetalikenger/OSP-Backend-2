@@ -8,7 +8,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface CompressorRepository extends JpaRepository<Compressor, Long>, CompressorRepositoryPort {
 
-    boolean existsByModel(String model);
+    boolean existsByModelAndDeletedFalse(String model);
 
-    boolean existsByModelAndIdNot(String model, Long id);
+    boolean existsByModelAndIdNotAndDeletedFalse(String model, Long id);
 }

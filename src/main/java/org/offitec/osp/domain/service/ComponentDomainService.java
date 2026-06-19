@@ -34,7 +34,7 @@ public class ComponentDomainService {
 
     public void validateUniqueModel(String model){
 
-        if(compressorRepositoryPort.existsByModel(model)){
+        if(compressorRepositoryPort.existsByModelAndDeletedFalse(model)){
 
             throw new ModelAlreadyExistsException("Compressor model already exists.");
         }
@@ -42,7 +42,7 @@ public class ComponentDomainService {
 
     public void validateUniqueModelForEdit(String model, Long id){
 
-        if(compressorRepositoryPort.existsByModelAndIdNot(model, id)){
+        if(compressorRepositoryPort.existsByModelAndIdNotAndDeletedFalse(model, id)){
 
             throw new ModelAlreadyExistsException("Compressor model already exists for another compressor.");
         }
@@ -50,7 +50,7 @@ public class ComponentDomainService {
 
     public void validateUniqueModelForEvaporator(String model){
 
-        if(evaporatorRepositoryPort.existsByModel(model)){
+        if(evaporatorRepositoryPort.existsByModelAndDeletedFalse(model)){
 
             throw new ModelAlreadyExistsException("Evaporator model already exists.");
         }
@@ -58,68 +58,68 @@ public class ComponentDomainService {
 
     public void validateUniqueModelForEditEvaporator(String model, Long id){
 
-        if(evaporatorRepositoryPort.existsByModelAndIdNot(model, id)){
+        if(evaporatorRepositoryPort.existsByModelAndIdNotAndDeletedFalse(model, id)){
 
             throw new ModelAlreadyExistsException("Evaporator model already exists for another evaporator.");
         }
     }
 
     public void validateUniqueModelForCondenser(String model){
-        if(condenserRepositoryPort.existsByModel(model)){
+        if(condenserRepositoryPort.existsByModelAndDeletedFalse(model)){
             throw new ModelAlreadyExistsException("Condenser model already exists.");
         }
     }
 
     public void validateUniqueModelForEditCondenser(String model, Long id){
-        if(condenserRepositoryPort.existsByModelAndIdNot(model, id)){
+        if(condenserRepositoryPort.existsByModelAndIdNotAndDeletedFalse(model, id)){
             throw new ModelAlreadyExistsException("Condenser model already exists for another condenser.");
         }
     }
 
     public void validateUniqueModelForExpansionValve(String model){
-        if(expansionValveRepositoryPort.existsByModel(model)){
+        if(expansionValveRepositoryPort.existsByModelAndDeletedFalse(model)){
             throw new ModelAlreadyExistsException("Expansion Valve model already exists.");
         }
     }
 
     public void validateUniqueModelForEditExpansionValve(String model, Long id){
-        if(expansionValveRepositoryPort.existsByModelAndIdNot(model, id)){
+        if(expansionValveRepositoryPort.existsByModelAndIdNotAndDeletedFalse(model, id)){
             throw new ModelAlreadyExistsException("Expansion Valve model already exists for another expansion valve.");
         }
     }
 
     public void validateUniqueModelForFourWayReversingValve(String model){
-        if(fourWayReversingValveRepositoryPort.existsByModel(model)){
+        if(fourWayReversingValveRepositoryPort.existsByModelAndDeletedFalse(model)){
             throw new ModelAlreadyExistsException("4-Way Reversing Valve model already exists.");
         }
     }
 
     public void validateUniqueModelForEditFourWayReversingValve(String model, Long id){
-        if(fourWayReversingValveRepositoryPort.existsByModelAndIdNot(model, id)){
+        if(fourWayReversingValveRepositoryPort.existsByModelAndIdNotAndDeletedFalse(model, id)){
             throw new ModelAlreadyExistsException("4-Way Reversing Valve model already exists for another valve.");
         }
     }
 
     public void validateUniqueModelForChassis(String model){
-        if(chassisRepositoryPort.existsByModel(model)){
+        if(chassisRepositoryPort.existsByModelAndDeletedFalse(model)){
             throw new ModelAlreadyExistsException("Chassis model already exists.");
         }
     }
 
     public void validateUniqueModelForEditChassis(String model, Long id){
-        if(chassisRepositoryPort.existsByModelAndIdNot(model, id)){
+        if(chassisRepositoryPort.existsByModelAndIdNotAndDeletedFalse(model, id)){
             throw new ModelAlreadyExistsException("Chassis model already exists for another chassis.");
         }
     }
 
     public void validateUniqueCodeForRefrigerant(String code){
-        if(refrigerantRepositoryPort.existsByCode(code)){
+        if(refrigerantRepositoryPort.existsByCodeAndDeletedFalse(code)){
             throw new ModelAlreadyExistsException("Refrigerant code already exists.");
         }
     }
 
     public void validateUniqueCodeForEditRefrigerant(String code, Long id){
-        if(refrigerantRepositoryPort.existsByCodeAndIdNot(code, id)){
+        if(refrigerantRepositoryPort.existsByCodeAndIdNotAndDeletedFalse(code, id)){
             throw new ModelAlreadyExistsException("Refrigerant code already exists for another refrigerant.");
         }
     }

@@ -5,9 +5,7 @@ import lombok.*;
 import org.offitec.osp.domain.enums.CompressorKind;
 
 @Entity
-@Table(name = "compressor", uniqueConstraints = {
-        @UniqueConstraint(name = "uc_compressor_model", columnNames = {"model"})
-})
+@Table(name = "compressor")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -28,4 +26,8 @@ public class Compressor {
 
     @Column(nullable = false)
     private String model;
+
+    @Column(nullable = false)
+    @org.hibernate.annotations.ColumnDefault("false")
+    private boolean deleted = false;
 }

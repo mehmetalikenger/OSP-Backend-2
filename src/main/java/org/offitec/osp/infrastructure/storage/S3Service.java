@@ -3,10 +3,15 @@ package org.offitec.osp.infrastructure.storage;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
+import net.coobird.thumbnailator.Thumbnails;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 @Service
@@ -34,15 +39,15 @@ public class S3Service {
     }
 
     public String uploadImage(String key, MultipartFile file) {
-        return upload(unitImagesBucket, key, file);
+        return uploadOptimized(unitImagesBucket, key, file);
     }
 
     public String uploadTechnicalImage(String key, MultipartFile file) {
-        return upload(unitTechnicalImagesBucket, key, file);
+        return uploadOptimized(unitTechnicalImagesBucket, key, file);
     }
 
     public String uploadIcon(String key, MultipartFile file) {
-        return upload(unitIconsBucket, key, file);
+        return uploadOptimized(unitIconsBucket, key, file);
     }
 
     public String uploadDocument(String key, MultipartFile file) {
@@ -95,5 +100,70 @@ public class S3Service {
         } catch (IOException e) {
             throw new RuntimeException("Failed to upload file to S3: " + key, e);
         }
+    }
+
+    // ---- Image optimization (resize + recompress before storing) ----
+
+    private static final int MAX_DIMENSION = 1920;   // cap the longest side
+    private static final double JPEG_QUALITY = 0.82; // ~82% quality for JPEGs
+
+    // Optimizes raster images (JPEG/PNG) before upload; everything else (SVG, GIF,
+    // unreadable files) and any failure falls back to the untouched original.
+    private String uploadOptimized(String bucket, String key, MultipartFile file) {
+        byte[] optimized;
+        String contentType;
+        try {
+            optimized = optimizeImage(file);
+            contentType = file.getContentType();
+        } catch (Exception e) {
+            optimized = null;
+            contentType = null;
+        }
+
+        if (optimized == null) {
+            return upload(bucket, key, file);
+        }
+
+        ObjectMetadata metadata = new ObjectMetadata();
+        metadata.setContentType(contentType);
+        metadata.setContentLength(optimized.length);
+        amazonS3.putObject(new PutObjectRequest(bucket, key, new ByteArrayInputStream(optimized), metadata));
+        return amazonS3.getUrl(bucket, key).toString();
+    }
+
+    // Returns optimized bytes, or null when the file should be stored as-is
+    // (non-raster type, undecodable, or when optimizing wouldn't save space).
+    private byte[] optimizeImage(MultipartFile file) throws IOException {
+        String contentType = file.getContentType();
+        String format;
+        if ("image/jpeg".equalsIgnoreCase(contentType)) {
+            format = "jpg";
+        } else if ("image/png".equalsIgnoreCase(contentType)) {
+            format = "png";
+        } else {
+            return null; // SVG, GIF, WebP, BMP, documents, etc. — leave untouched
+        }
+
+        BufferedImage image = ImageIO.read(file.getInputStream());
+        if (image == null) {
+            return null; // not a decodable raster image (e.g. CMYK JPEG)
+        }
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Thumbnails.Builder<BufferedImage> builder = Thumbnails.of(image);
+        if (image.getWidth() > MAX_DIMENSION || image.getHeight() > MAX_DIMENSION) {
+            builder.size(MAX_DIMENSION, MAX_DIMENSION); // shrink to fit, keep aspect ratio
+        } else {
+            builder.scale(1.0); // keep original size, just recompress
+        }
+        builder.outputFormat(format);
+        if ("jpg".equals(format)) {
+            builder.outputQuality(JPEG_QUALITY); // quality only applies to JPEG
+        }
+        builder.toOutputStream(out);
+
+        byte[] bytes = out.toByteArray();
+        // Only use the optimized version when it actually saves space.
+        return bytes.length < file.getSize() ? bytes : null;
     }
 }

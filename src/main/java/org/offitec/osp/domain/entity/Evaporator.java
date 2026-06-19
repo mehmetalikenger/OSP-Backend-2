@@ -21,4 +21,8 @@ public class Evaporator {
 
     @Column(nullable = false)
     private String model;
+
+    @Column(nullable = false)
+    @org.hibernate.annotations.ColumnDefault("false")
+    private boolean deleted = false;
 }

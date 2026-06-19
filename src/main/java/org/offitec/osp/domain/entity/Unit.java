@@ -8,12 +8,7 @@ import org.offitec.osp.domain.enums.UnitTypeEnum;
 import java.util.List;
 
 @Entity
-@Table(
-    name = "unit",
-    uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"brand", "series", "model"})
-    }
-)
+@Table(name = "unit")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -43,6 +38,10 @@ public class Unit {
     @Enumerated(EnumType.STRING)
     @Column(name = "unit_type", nullable = false)
     private UnitTypeEnum unitType;
+
+    @Column(nullable = false)
+    @org.hibernate.annotations.ColumnDefault("false")
+    private boolean deleted = false;
 
     // --- Common technical attributes (shared across all modes of the unit) ---
 

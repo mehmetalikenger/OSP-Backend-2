@@ -64,6 +64,7 @@ public class PublicUnitAppService {
     public List<UnitCardDTO> getUnitsByType(UnitCategory category, UnitTypeEnum unitType) {
         Long userId = currentUserId();
         return unitJpaRepository.findByCategoryAndUnitType(category, unitType).stream()
+                .filter(u -> !u.isDeleted())
                 .map(u -> toCard(u, userId))
                 .collect(Collectors.toList());
     }
@@ -74,6 +75,7 @@ public class PublicUnitAppService {
     public UnitDetailPublicDTO getUnitDetail(Long id) {
         Unit unit = unitJpaRepository.findById(id)
                 .orElseThrow(() -> new UnitDoesntExistException("Unit not found."));
+        if (unit.isDeleted()) throw new UnitDoesntExistException("Unit not found.");
         Long userId = currentUserId();
         return toDetail(unit, userId);
     }
@@ -106,7 +108,8 @@ public class PublicUnitAppService {
         Long userId = currentUserId();
         return savedUnitRepository.findByUserId(userId).stream()
                 .map(SavedUnit::getUnit)
-                .filter(u -> (category == null || u.getCategory() == category)
+                .filter(u -> !u.isDeleted()
+                        && (category == null || u.getCategory() == category)
                         && (unitType == null || u.getUnitType() == unitType))
                 .map(u -> toCard(u, userId))
                 .collect(Collectors.toList());
@@ -198,7 +201,7 @@ public class PublicUnitAppService {
         double totalQ = q * unit.getCompressorQty();
         double totalP = p * unit.getCompressorQty();
         double cop = totalP > 0 ? totalQ / totalP : 0;
-        double copEer = mod == Mod.COOLING ? cop * 3.412 : cop;
+        double copEer = cop;
 
         CustomCalculationValues customVals = new CustomCalculationValues(
                 null,
@@ -349,13 +352,13 @@ public class PublicUnitAppService {
         if (unit.getCondenserQty() > 0) addSpec(specs, "Condensers", String.valueOf(unit.getCondenserQty()));
         if (unit.getExpansionValveQty() > 0) addSpec(specs, "Expansion Valves", String.valueOf(unit.getExpansionValveQty()));
         if (unit.getNumberOfFans() > 0) addSpec(specs, "Number of Fans", String.valueOf(unit.getNumberOfFans()));
-        if (unit.getFanDiameter() > 0) addSpec(specs, "Fan Diameter", unit.getFanDiameter() + " mm");
-        if (unit.getAirflowRate() > 0) addSpec(specs, "Airflow Rate", unit.getAirflowRate() + " m³/h");
-        if (unit.getFanPI() > 0) addSpec(specs, "Fan Power Input", unit.getFanPI() + " kW");
+        if (unit.getFanDiameter() > 0) addSpec(specs, "Fan Diameter", fmtNum(unit.getFanDiameter()) + " mm");
+        if (unit.getAirflowRate() > 0) addSpec(specs, "Airflow Rate", fmtNum(unit.getAirflowRate()) + " m³/h");
+        if (unit.getFanPI() > 0) addSpec(specs, "Fan Power Input", fmtNum(unit.getFanPI()) + " kW");
         if (unit.getWidth() > 0 && unit.getHeight() > 0 && unit.getLength() > 0) {
             addSpec(specs, "Dimensions (W×H×L)", String.format("%.0f × %.0f × %.0f mm", unit.getWidth(), unit.getHeight(), unit.getLength()));
         }
-        if (unit.getGasTank() > 0) addSpec(specs, "Gas Tank", unit.getGasTank() + " L");
+        if (unit.getGasTank() > 0) addSpec(specs, "Gas Tank", fmtNum(unit.getGasTank()) + " L");
         if (unit.getDischargeLineDiameter() != null && !unit.getDischargeLineDiameter().isBlank()) {
             addSpec(specs, "Discharge Line Diameter", unit.getDischargeLineDiameter());
         }
@@ -367,6 +370,13 @@ public class PublicUnitAppService {
         }
 
         return specs;
+    }
+
+    private String fmtNum(double v) {
+        if (v == Math.rint(v) && !Double.isInfinite(v)) {
+            return String.valueOf((long) v);
+        }
+        return String.valueOf(v);
     }
 
     private void addSpec(List<TechSpecItemDTO> specs, String label, String value) {

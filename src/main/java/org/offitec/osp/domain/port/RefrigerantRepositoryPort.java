@@ -1,6 +1,6 @@
 package org.offitec.osp.domain.port;
 
 public interface RefrigerantRepositoryPort {
-    boolean existsByCode(String code);
-    boolean existsByCodeAndIdNot(String code, Long id);
+    boolean existsByCodeAndDeletedFalse(String code);
+    boolean existsByCodeAndIdNotAndDeletedFalse(String code, Long id);
 }

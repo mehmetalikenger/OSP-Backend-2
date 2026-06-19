@@ -4,6 +4,8 @@ import org.offitec.osp.domain.entity.*;
 import org.offitec.osp.domain.enums.CompressorKind;
 import org.offitec.osp.domain.exception.*;
 import org.offitec.osp.domain.service.ComponentDomainService;
+import org.offitec.osp.domain.service.AuditLogService;
+import org.offitec.osp.domain.port.UserRepositoryPort;
 import org.offitec.osp.infrastructure.repository.*;
 import org.offitec.osp.presentation.dto.*;
 import org.springframework.stereotype.Service;
@@ -29,8 +31,10 @@ public class ComponentAppService {
     private final FourWayReversingValveSpecsRepository fourWayReversingValveSpecsRepository;
     private final ChassisRepository chassisRepository;
     private final RefrigerantRepository refrigerantRepository;
+    private final AuditLogService auditLogService;
+    private final UserRepositoryPort userRepositoryPort;
 
-    public ComponentAppService(ComponentDomainService componentDomainService, CompressorRepository compressorRepository, CompressorSpecsRepository compressorSpecsRepository, EvaporatorRepository evaporatorRepository, EvaporatorSpecsRepository evaporatorSpecsRepository, CondenserRepository condenserRepository, CondenserSpecsRepository condenserSpecsRepository, ExpansionValveRepository expansionValveRepository, ExpansionValveSpecsRepository expansionValveSpecsRepository, FourWayReversingValveRepository fourWayReversingValveRepository, FourWayReversingValveSpecsRepository fourWayReversingValveSpecsRepository, ChassisRepository chassisRepository, RefrigerantRepository refrigerantRepository) {
+    public ComponentAppService(ComponentDomainService componentDomainService, CompressorRepository compressorRepository, CompressorSpecsRepository compressorSpecsRepository, EvaporatorRepository evaporatorRepository, EvaporatorSpecsRepository evaporatorSpecsRepository, CondenserRepository condenserRepository, CondenserSpecsRepository condenserSpecsRepository, ExpansionValveRepository expansionValveRepository, ExpansionValveSpecsRepository expansionValveSpecsRepository, FourWayReversingValveRepository fourWayReversingValveRepository, FourWayReversingValveSpecsRepository fourWayReversingValveSpecsRepository, ChassisRepository chassisRepository, RefrigerantRepository refrigerantRepository, AuditLogService auditLogService, UserRepositoryPort userRepositoryPort) {
         this.componentDomainService = componentDomainService;
         this.compressorRepository = compressorRepository;
         this.compressorSpecsRepository = compressorSpecsRepository;
@@ -44,6 +48,8 @@ public class ComponentAppService {
         this.fourWayReversingValveSpecsRepository = fourWayReversingValveSpecsRepository;
         this.chassisRepository = chassisRepository;
         this.refrigerantRepository = refrigerantRepository;
+        this.auditLogService = auditLogService;
+        this.userRepositoryPort = userRepositoryPort;
     }
 
     @Transactional
@@ -60,7 +66,7 @@ public class ComponentAppService {
     }
 
     public List<Compressor> getAllCompressors() {
-        return compressorRepository.findAll();
+        return compressorRepository.findAll().stream().filter(x -> !x.isDeleted()).collect(Collectors.toList());
     }
 
     @Transactional
@@ -134,7 +140,7 @@ public class ComponentAppService {
     }
 
     public List<CompressorSpecsResponseDTO> getAllCompressorSpecs() {
-        return compressorSpecsRepository.findAll().stream().map(specs -> {
+        return compressorSpecsRepository.findAll().stream().filter(specs -> specs.getCompressor() != null && !specs.getCompressor().isDeleted()).map(specs -> {
             CompressorSpecsResponseDTO dto = new CompressorSpecsResponseDTO();
             dto.setId(specs.getId());
             dto.setCapacity(specs.getCapacity());
@@ -185,7 +191,7 @@ public class ComponentAppService {
     }
 
     public List<Evaporator> getAllEvaporators() {
-        return evaporatorRepository.findAll();
+        return evaporatorRepository.findAll().stream().filter(x -> !x.isDeleted()).collect(Collectors.toList());
     }
 
     @Transactional
@@ -222,7 +228,7 @@ public class ComponentAppService {
     }
 
     public List<EvaporatorSpecsResponseDTO> getAllEvaporatorSpecs() {
-        return evaporatorSpecsRepository.findAll().stream().map(specs -> {
+        return evaporatorSpecsRepository.findAll().stream().filter(specs -> specs.getEvaporator() != null && !specs.getEvaporator().isDeleted()).map(specs -> {
             EvaporatorSpecsResponseDTO dto = new EvaporatorSpecsResponseDTO();
             dto.setId(specs.getId());
             dto.setCapacity(specs.getCapacity());
@@ -257,7 +263,7 @@ public class ComponentAppService {
     }
 
     public List<Condenser> getAllCondensers() {
-        return condenserRepository.findAll();
+        return condenserRepository.findAll().stream().filter(x -> !x.isDeleted()).collect(Collectors.toList());
     }
 
     @Transactional
@@ -285,7 +291,7 @@ public class ComponentAppService {
     }
 
     public List<CondenserSpecsResponseDTO> getAllCondenserSpecs() {
-        return condenserSpecsRepository.findAll().stream().map(specs -> {
+        return condenserSpecsRepository.findAll().stream().filter(specs -> specs.getCondenser() != null && !specs.getCondenser().isDeleted()).map(specs -> {
             CondenserSpecsResponseDTO dto = new CondenserSpecsResponseDTO();
             dto.setId(specs.getId());
             dto.setCapacity(specs.getCapacity());
@@ -320,7 +326,7 @@ public class ComponentAppService {
     }
 
     public List<ExpansionValve> getAllExpansionValves() {
-        return expansionValveRepository.findAll();
+        return expansionValveRepository.findAll().stream().filter(x -> !x.isDeleted()).collect(Collectors.toList());
     }
 
     @Transactional
@@ -348,7 +354,7 @@ public class ComponentAppService {
     }
 
     public List<ExpansionValveSpecsResponseDTO> getAllExpansionValveSpecs() {
-        return expansionValveSpecsRepository.findAll().stream().map(specs -> {
+        return expansionValveSpecsRepository.findAll().stream().filter(specs -> specs.getExpansionValve() != null && !specs.getExpansionValve().isDeleted()).map(specs -> {
             ExpansionValveSpecsResponseDTO dto = new ExpansionValveSpecsResponseDTO();
             dto.setId(specs.getId());
             dto.setCapacity(specs.getCapacity());
@@ -383,7 +389,7 @@ public class ComponentAppService {
     }
 
     public List<FourWayReversingValve> getAllFourWayReversingValves() {
-        return fourWayReversingValveRepository.findAll();
+        return fourWayReversingValveRepository.findAll().stream().filter(x -> !x.isDeleted()).collect(Collectors.toList());
     }
 
     @Transactional
@@ -411,7 +417,7 @@ public class ComponentAppService {
     }
 
     public List<FourWayReversingValveSpecsResponseDTO> getAllFourWayReversingValveSpecs() {
-        return fourWayReversingValveSpecsRepository.findAll().stream().map(specs -> {
+        return fourWayReversingValveSpecsRepository.findAll().stream().filter(specs -> specs.getFourWayReversingValve() != null && !specs.getFourWayReversingValve().isDeleted()).map(specs -> {
             FourWayReversingValveSpecsResponseDTO dto = new FourWayReversingValveSpecsResponseDTO();
             dto.setId(specs.getId());
             dto.setCapacity(specs.getCapacity());
@@ -434,7 +440,7 @@ public class ComponentAppService {
     }
 
     public List<Chassis> getAllChassis() {
-        return chassisRepository.findAll();
+        return chassisRepository.findAll().stream().filter(x -> !x.isDeleted()).collect(Collectors.toList());
     }
 
     @Transactional
@@ -461,7 +467,7 @@ public class ComponentAppService {
     }
 
     public List<Refrigerant> getAllRefrigerants() {
-        return refrigerantRepository.findAll();
+        return refrigerantRepository.findAll().stream().filter(x -> !x.isDeleted()).collect(Collectors.toList());
     }
 
     @Transactional
@@ -475,5 +481,77 @@ public class ComponentAppService {
         refrigerant.setName(dto.getName());
         refrigerant.setCode(dto.getCode());
         refrigerantRepository.save(refrigerant);
+    }
+
+    // --- SOFT DELETE ---
+    // Components are never hard-deleted: existing units reference their specs, so we
+    // flag them deleted (hidden from all listings) and record the action in the audit log.
+
+    private Long resolveAdminId(String adminEmail) {
+        if (adminEmail == null) return -1L;
+        return userRepositoryPort.findByEmail(adminEmail).map(User::getId).orElse(-1L);
+    }
+
+    @Transactional
+    public void deleteCompressor(Long id, String adminEmail) {
+        Compressor c = compressorRepository.findById(id)
+                .orElseThrow(() -> new CompressorDoesntExistException("Compressor doesn't exist."));
+        c.setDeleted(true);
+        compressorRepository.save(c);
+        auditLogService.logAdminAction(resolveAdminId(adminEmail), "DELETE", "COMPRESSOR", id, "Deleted compressor " + c.getModel());
+    }
+
+    @Transactional
+    public void deleteEvaporator(Long id, String adminEmail) {
+        Evaporator e = evaporatorRepository.findById(id)
+                .orElseThrow(() -> new EvaporatorDoesntExistException("Evaporator doesn't exist."));
+        e.setDeleted(true);
+        evaporatorRepository.save(e);
+        auditLogService.logAdminAction(resolveAdminId(adminEmail), "DELETE", "EVAPORATOR", id, "Deleted evaporator " + e.getModel());
+    }
+
+    @Transactional
+    public void deleteCondenser(Long id, String adminEmail) {
+        Condenser c = condenserRepository.findById(id)
+                .orElseThrow(() -> new CondenserDoesntExistException("Condenser doesn't exist."));
+        c.setDeleted(true);
+        condenserRepository.save(c);
+        auditLogService.logAdminAction(resolveAdminId(adminEmail), "DELETE", "CONDENSER", id, "Deleted condenser " + c.getModel());
+    }
+
+    @Transactional
+    public void deleteExpansionValve(Long id, String adminEmail) {
+        ExpansionValve ev = expansionValveRepository.findById(id)
+                .orElseThrow(() -> new ExpansionValveDoesntExistException("Expansion Valve doesn't exist."));
+        ev.setDeleted(true);
+        expansionValveRepository.save(ev);
+        auditLogService.logAdminAction(resolveAdminId(adminEmail), "DELETE", "EXPANSION_VALVE", id, "Deleted expansion valve " + ev.getModel());
+    }
+
+    @Transactional
+    public void deleteFourWayReversingValve(Long id, String adminEmail) {
+        FourWayReversingValve v = fourWayReversingValveRepository.findById(id)
+                .orElseThrow(() -> new FourWayReversingValveDoesntExistException("4-Way Reversing Valve doesn't exist."));
+        v.setDeleted(true);
+        fourWayReversingValveRepository.save(v);
+        auditLogService.logAdminAction(resolveAdminId(adminEmail), "DELETE", "FOUR_WAY_REVERSING_VALVE", id, "Deleted 4-way reversing valve " + v.getModel());
+    }
+
+    @Transactional
+    public void deleteChassis(Long id, String adminEmail) {
+        Chassis ch = chassisRepository.findById(id)
+                .orElseThrow(() -> new ChassisDoesntExistException("Chassis doesn't exist."));
+        ch.setDeleted(true);
+        chassisRepository.save(ch);
+        auditLogService.logAdminAction(resolveAdminId(adminEmail), "DELETE", "CHASSIS", id, "Deleted chassis " + ch.getModel());
+    }
+
+    @Transactional
+    public void deleteRefrigerant(Long id, String adminEmail) {
+        Refrigerant r = refrigerantRepository.findById(id)
+                .orElseThrow(() -> new RefrigerantDoesntExistException("Refrigerant doesn't exist."));
+        r.setDeleted(true);
+        refrigerantRepository.save(r);
+        auditLogService.logAdminAction(resolveAdminId(adminEmail), "DELETE", "REFRIGERANT", id, "Deleted refrigerant " + r.getCode());
     }
 }

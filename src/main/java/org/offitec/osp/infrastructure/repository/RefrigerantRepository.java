@@ -7,6 +7,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface RefrigerantRepository extends JpaRepository<Refrigerant, Long>, RefrigerantRepositoryPort {
-    boolean existsByCode(String code);
-    boolean existsByCodeAndIdNot(String code, Long id);
+    boolean existsByCodeAndDeletedFalse(String code);
+    boolean existsByCodeAndIdNotAndDeletedFalse(String code, Long id);
 }

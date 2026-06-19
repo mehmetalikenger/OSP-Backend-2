@@ -6,5 +6,5 @@ import java.util.Optional;
 
 public interface UnitRepository {
 
-    Optional<Unit> findByModel(String model);
+    Optional<Unit> findByModelAndDeletedFalse(String model);
 }

@@ -50,6 +50,14 @@ public class UnitController {
         return HttpStatus.OK;
     }
 
+    // Soft-delete any unit (chiller or heat pump) by id.
+    @DeleteMapping("/{id}")
+    public HttpStatus deleteUnit(@PathVariable Long id) {
+        String adminEmail = (String) org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        unitAppService.deleteUnit(id, adminEmail);
+        return HttpStatus.OK;
+    }
+
     // --- Heat pump ---
 
     @PostMapping("/heat-pump")

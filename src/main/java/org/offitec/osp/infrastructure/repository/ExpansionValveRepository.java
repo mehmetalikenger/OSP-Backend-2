@@ -7,6 +7,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ExpansionValveRepository extends JpaRepository<ExpansionValve, Long>, ExpansionValveRepositoryPort {
-    boolean existsByModel(String model);
-    boolean existsByModelAndIdNot(String model, Long id);
+    boolean existsByModelAndDeletedFalse(String model);
+    boolean existsByModelAndIdNotAndDeletedFalse(String model, Long id);
 }

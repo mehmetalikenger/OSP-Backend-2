@@ -2,7 +2,7 @@ package org.offitec.osp.domain.port;
 
 public interface CompressorRepositoryPort {
 
-    public boolean existsByModel(String model);
+    public boolean existsByModelAndDeletedFalse(String model);
 
-    public boolean existsByModelAndIdNot(String model, Long id);
+    public boolean existsByModelAndIdNotAndDeletedFalse(String model, Long id);
 }

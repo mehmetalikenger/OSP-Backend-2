@@ -7,6 +7,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface EvaporatorRepository extends JpaRepository<Evaporator, Long>, EvaporatorRepositoryPort {
-    boolean existsByModel(String model);
-    boolean existsByModelAndIdNot(String model, Long id);
+    boolean existsByModelAndDeletedFalse(String model);
+    boolean existsByModelAndIdNotAndDeletedFalse(String model, Long id);
 }

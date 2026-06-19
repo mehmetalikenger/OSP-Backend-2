@@ -15,7 +15,7 @@ public class UnitDomainService {
 
     public void validateUniqueModel(String model) {
 
-        if (unitRepository.findByModel(model).isPresent()) {
+        if (unitRepository.findByModelAndDeletedFalse(model).isPresent()) {
 
             throw new ModelAlreadyExistsException("A unit with this model already exists.");
         }
@@ -23,7 +23,7 @@ public class UnitDomainService {
 
     public void validateUniqueModelForEdit(String model, Long id) {
 
-        unitRepository.findByModel(model).ifPresent(existing -> {
+        unitRepository.findByModelAndDeletedFalse(model).ifPresent(existing -> {
             if (!existing.getId().equals(id)) {
                 throw new ModelAlreadyExistsException("A unit with this model already exists.");
             }
