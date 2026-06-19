@@ -29,15 +29,13 @@ spring:
       reset-password-key-exp-time: 900
       same-site: ${SAME_SITE}
   storage:
-    s3:
-      aws-access-key: ${AWS_ACCESS_KEY}
-      aws-secret-key: ${AWS_SECRET_KEY}
-      aws-region: eu-central-1
-      unit-images-bucket-name: s3-osp-unit-images
-      unit-technicalImages-bucket-name: s3-osp-unit-technical-images
-      unit-icons-bucket-name: s3-osp-unit-icons
-      unit-documents-bucket-name: s3-osp-unit-documents
-      user-pictures-bucket-name: s3-osp-user-profile-pictures
+    r2:
+      access-key: ${R2_ACCESS_KEY}
+      secret-key: ${R2_SECRET_KEY}
+      region: auto
+      endpoint: https://966e84eb6dc2468789ec5446ee5d137b.r2.cloudflarestorage.com
+      bucket-name: osp-asset
+      public-base-url: ${R2_PUBLIC_BASE_URL}
 
 mailgun:
   api-key: ${MAILGUN_API_KEY}

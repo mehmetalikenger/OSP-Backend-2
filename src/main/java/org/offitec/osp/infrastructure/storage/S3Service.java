@@ -17,99 +17,97 @@ import java.io.IOException;
 @Service
 public class S3Service {
 
-    @Value("${spring.storage.s3.unit-images-bucket-name}")
-    private String unitImagesBucket;
+    private static final String PREFIX_IMAGES    = "unit-images";
+    private static final String PREFIX_TECHNICAL = "technical-images";
+    private static final String PREFIX_ICONS     = "icons";
+    private static final String PREFIX_DOCUMENTS = "documents";
+    private static final String PREFIX_USERS     = "user-pictures";
 
-    @Value("${spring.storage.s3.unit-technicalImages-bucket-name}")
-    private String unitTechnicalImagesBucket;
+    @Value("${spring.storage.r2.bucket-name}")
+    private String bucket;
 
-    @Value("${spring.storage.s3.unit-icons-bucket-name}")
-    private String unitIconsBucket;
+    @Value("${spring.storage.r2.public-base-url}")
+    private String publicBaseUrl;
 
-    @Value("${spring.storage.s3.unit-documents-bucket-name}")
-    private String unitDocumentsBucket;
+    private final AmazonS3 storage;
 
-    @Value("${spring.storage.s3.user-pictures-bucket-name}")
-    private String userPicturesBucket;
-
-    private final AmazonS3 amazonS3;
-
-    public S3Service(AmazonS3 amazonS3) {
-        this.amazonS3 = amazonS3;
+    public S3Service(AmazonS3 storage) {
+        this.storage = storage;
     }
 
     public String uploadImage(String key, MultipartFile file) {
-        return uploadOptimized(unitImagesBucket, key, file);
+        return uploadOptimized(PREFIX_IMAGES + "/" + key, file);
     }
 
     public String uploadTechnicalImage(String key, MultipartFile file) {
-        return uploadOptimized(unitTechnicalImagesBucket, key, file);
+        return uploadOptimized(PREFIX_TECHNICAL + "/" + key, file);
     }
 
     public String uploadIcon(String key, MultipartFile file) {
-        return uploadOptimized(unitIconsBucket, key, file);
+        return uploadOptimized(PREFIX_ICONS + "/" + key, file);
     }
 
     public String uploadDocument(String key, MultipartFile file) {
-        return upload(unitDocumentsBucket, key, file);
+        return upload(PREFIX_DOCUMENTS + "/" + key, file);
     }
 
-    public String uploadUserPicture(String key, MultipartFile file) { return upload(userPicturesBucket, key, file); }
-    public void deleteUserPicture(String url)    { delete(userPicturesBucket, url); }
-    public String presignUserPicture(String url) { return presign(userPicturesBucket, url); }
+    public String uploadUserPicture(String key, MultipartFile file) {
+        return upload(PREFIX_USERS + "/" + key, file);
+    }
 
-    public void deleteImage(String url)          { delete(unitImagesBucket, url); }
-    public void deleteTechnicalImage(String url) { delete(unitTechnicalImagesBucket, url); }
-    public void deleteIcon(String url)           { delete(unitIconsBucket, url); }
-    public void deleteDocument(String url)       { delete(unitDocumentsBucket, url); }
+    public void deleteImage(String url)          { delete(url); }
+    public void deleteTechnicalImage(String url) { delete(url); }
+    public void deleteIcon(String url)           { delete(url); }
+    public void deleteDocument(String url)       { delete(url); }
+    public void deleteUserPicture(String url)    { delete(url); }
 
-    public String presignImage(String url)          { return presign(unitImagesBucket, url); }
-    public String presignTechnicalImage(String url) { return presign(unitTechnicalImagesBucket, url); }
-    public String presignIcon(String url)           { return presign(unitIconsBucket, url); }
-    public String presignDocument(String url)       { return presign(unitDocumentsBucket, url); }
+    public String presignImage(String url)          { return presign(url); }
+    public String presignTechnicalImage(String url) { return presign(url); }
+    public String presignIcon(String url)           { return presign(url); }
+    public String presignDocument(String url)       { return presign(url); }
+    public String presignUserPicture(String url)    { return presign(url); }
 
-    private String presign(String bucket, String url) {
+    private String presign(String url) {
         try {
             String key = new java.net.URI(url).getPath().substring(1);
-            java.util.Date expiration = new java.util.Date(System.currentTimeMillis() + 3_600_000L); // 1 h
-            return amazonS3.generatePresignedUrl(bucket, key, expiration).toString();
+            java.util.Date expiration = new java.util.Date(System.currentTimeMillis() + 3_600_000L);
+            return storage.generatePresignedUrl(bucket, key, expiration).toString();
         } catch (Exception e) {
             throw new RuntimeException("Failed to generate pre-signed URL: " + url, e);
         }
     }
 
-    private void delete(String bucket, String url) {
+    private void delete(String url) {
         try {
             String key = new java.net.URI(url).getPath().substring(1);
-            amazonS3.deleteObject(bucket, key);
+            storage.deleteObject(bucket, key);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to delete S3 object: " + url, e);
+            throw new RuntimeException("Failed to delete object: " + url, e);
         }
     }
 
-    // Streams the file straight to S3 (no temp file on disk) and returns the stored object URL.
-    private String upload(String bucket, String key, MultipartFile file) {
+    private String upload(String key, MultipartFile file) {
         try {
             ObjectMetadata metadata = new ObjectMetadata();
             metadata.setContentType(file.getContentType());
             metadata.setContentLength(file.getSize());
+            metadata.setCacheControl("public, max-age=31536000");
 
-            amazonS3.putObject(new PutObjectRequest(bucket, key, file.getInputStream(), metadata));
-
-            return amazonS3.getUrl(bucket, key).toString();
+            storage.putObject(new PutObjectRequest(bucket, key, file.getInputStream(), metadata));
+            return publicBaseUrl + "/" + key;
         } catch (IOException e) {
-            throw new RuntimeException("Failed to upload file to S3: " + key, e);
+            throw new RuntimeException("Failed to upload file: " + key, e);
         }
     }
 
     // ---- Image optimization (resize + recompress before storing) ----
 
-    private static final int MAX_DIMENSION = 1920;   // cap the longest side
-    private static final double JPEG_QUALITY = 0.82; // ~82% quality for JPEGs
+    private static final int MAX_DIMENSION = 1920;
+    private static final double JPEG_QUALITY = 0.82;
 
     // Optimizes raster images (JPEG/PNG) before upload; everything else (SVG, GIF,
     // unreadable files) and any failure falls back to the untouched original.
-    private String uploadOptimized(String bucket, String key, MultipartFile file) {
+    private String uploadOptimized(String key, MultipartFile file) {
         byte[] optimized;
         String contentType;
         try {
@@ -121,14 +119,15 @@ public class S3Service {
         }
 
         if (optimized == null) {
-            return upload(bucket, key, file);
+            return upload(key, file);
         }
 
         ObjectMetadata metadata = new ObjectMetadata();
         metadata.setContentType(contentType);
         metadata.setContentLength(optimized.length);
-        amazonS3.putObject(new PutObjectRequest(bucket, key, new ByteArrayInputStream(optimized), metadata));
-        return amazonS3.getUrl(bucket, key).toString();
+        metadata.setCacheControl("public, max-age=31536000");
+        storage.putObject(new PutObjectRequest(bucket, key, new ByteArrayInputStream(optimized), metadata));
+        return publicBaseUrl + "/" + key;
     }
 
     // Returns optimized bytes, or null when the file should be stored as-is
@@ -141,29 +140,28 @@ public class S3Service {
         } else if ("image/png".equalsIgnoreCase(contentType)) {
             format = "png";
         } else {
-            return null; // SVG, GIF, WebP, BMP, documents, etc. — leave untouched
+            return null;
         }
 
         BufferedImage image = ImageIO.read(file.getInputStream());
         if (image == null) {
-            return null; // not a decodable raster image (e.g. CMYK JPEG)
+            return null;
         }
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         Thumbnails.Builder<BufferedImage> builder = Thumbnails.of(image);
         if (image.getWidth() > MAX_DIMENSION || image.getHeight() > MAX_DIMENSION) {
-            builder.size(MAX_DIMENSION, MAX_DIMENSION); // shrink to fit, keep aspect ratio
+            builder.size(MAX_DIMENSION, MAX_DIMENSION);
         } else {
-            builder.scale(1.0); // keep original size, just recompress
+            builder.scale(1.0);
         }
         builder.outputFormat(format);
         if ("jpg".equals(format)) {
-            builder.outputQuality(JPEG_QUALITY); // quality only applies to JPEG
+            builder.outputQuality(JPEG_QUALITY);
         }
         builder.toOutputStream(out);
 
         byte[] bytes = out.toByteArray();
-        // Only use the optimized version when it actually saves space.
         return bytes.length < file.getSize() ? bytes : null;
     }
 }
