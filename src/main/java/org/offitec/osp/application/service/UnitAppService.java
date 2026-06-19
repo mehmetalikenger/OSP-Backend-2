@@ -124,19 +124,29 @@ public class UnitAppService {
         if (files == null) {
             return;
         }
-        for (MultipartFile file : files) {
-            if (!notEmpty(file)) {
-                continue;
-            }
-            String key = buildKey(unit.getId(), file);
-            String url = switch (type) {
-                case IMAGE -> s3Service.uploadImage(key, file);
-                case DRAWING -> s3Service.uploadTechnicalImage(key, file);
-                case ICON -> s3Service.uploadIcon(key, file);
-                case DOCUMENT -> s3Service.uploadDocument(key, file);
-            };
+        List<MultipartFile> valid = files.stream().filter(this::notEmpty).toList();
+        if (valid.isEmpty()) {
+            return;
+        }
+        // Optimize + upload to S3 in parallel: image processing and the S3 round-trip
+        // are the slow parts, so this cuts the wall time for multi-image uploads.
+        Long unitId = unit.getId();
+        List<String> urls = valid.parallelStream()
+                .map(file -> uploadToS3(buildKey(unitId, file), file, type))
+                .toList();
+        // Persist on the calling thread (the JPA session is not thread-safe).
+        for (String url : urls) {
             persistAsset(unit, type, url, false);
         }
+    }
+
+    private String uploadToS3(String key, MultipartFile file, AssetType type) {
+        return switch (type) {
+            case IMAGE -> s3Service.uploadImage(key, file);
+            case DRAWING -> s3Service.uploadTechnicalImage(key, file);
+            case ICON -> s3Service.uploadIcon(key, file);
+            case DOCUMENT -> s3Service.uploadDocument(key, file);
+        };
     }
 
     private void persistAsset(Unit unit, AssetType type, String url, boolean isPrimary) {
