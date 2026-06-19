@@ -12,7 +12,6 @@ import org.offitec.osp.infrastructure.repository.SavedUnitRepository;
 import org.offitec.osp.infrastructure.repository.UnitDetailsRepository;
 import org.offitec.osp.infrastructure.repository.UnitJpaRepository;
 import org.offitec.osp.infrastructure.repository.UserRepository;
-import org.offitec.osp.infrastructure.storage.S3Service;
 import org.offitec.osp.presentation.dto.CalcAssetDTO;
 import org.offitec.osp.presentation.dto.CalculationRequestDTO;
 import org.offitec.osp.presentation.dto.CalculationResultDTO;
@@ -40,22 +39,19 @@ public class PublicUnitAppService {
     private final CalculationOutputValuesRepository calcOutputValsRepository;
     private final SavedUnitRepository savedUnitRepository;
     private final UserRepository userRepository;
-    private final S3Service s3Service;
 
     public PublicUnitAppService(UnitJpaRepository unitJpaRepository,
                                 UnitDetailsRepository unitDetailsRepository,
                                 CustomCalculationValuesRepository customCalcValsRepository,
                                 CalculationOutputValuesRepository calcOutputValsRepository,
                                 SavedUnitRepository savedUnitRepository,
-                                UserRepository userRepository,
-                                S3Service s3Service) {
+                                UserRepository userRepository) {
         this.unitJpaRepository = unitJpaRepository;
         this.unitDetailsRepository = unitDetailsRepository;
         this.customCalcValsRepository = customCalcValsRepository;
         this.calcOutputValsRepository = calcOutputValsRepository;
         this.savedUnitRepository = savedUnitRepository;
         this.userRepository = userRepository;
-        this.s3Service = s3Service;
     }
 
     // --- Listing ---
@@ -129,12 +125,9 @@ public class PublicUnitAppService {
         if (unit.getAssets() != null) {
             for (UnitAsset a : unit.getAssets()) {
                 switch (a.getAssetType()) {
-                    case IMAGE -> images.add(new CalcAssetDTO(s3Service.presignImage(a.getUrl()), null));
-                    case DRAWING -> drawings.add(new CalcAssetDTO(s3Service.presignTechnicalImage(a.getUrl()), null));
-                    case DOCUMENT -> {
-                        String presigned = s3Service.presignDocument(a.getUrl());
-                        documents.add(new CalcAssetDTO(presigned, extractFileName(a.getUrl())));
-                    }
+                    case IMAGE   -> images.add(new CalcAssetDTO(a.getUrl(), null));
+                    case DRAWING -> drawings.add(new CalcAssetDTO(a.getUrl(), null));
+                    case DOCUMENT -> documents.add(new CalcAssetDTO(a.getUrl(), extractFileName(a.getUrl())));
                     default -> {}
                 }
             }
@@ -261,7 +254,7 @@ public class PublicUnitAppService {
         if (assets != null) {
             for (UnitAsset a : assets) {
                 if (a.getAssetType() == AssetType.IMAGE && a.isPrimary()) {
-                    primaryImageUrl = s3Service.presignImage(a.getUrl());
+                    primaryImageUrl = a.getUrl();
                     break;
                 }
             }
@@ -292,9 +285,9 @@ public class PublicUnitAppService {
         if (assets != null) {
             for (UnitAsset a : assets) {
                 if (a.getAssetType() == AssetType.IMAGE && a.isPrimary()) {
-                    primaryImageUrl = s3Service.presignImage(a.getUrl());
+                    primaryImageUrl = a.getUrl();
                 } else if (a.getAssetType() == AssetType.ICON) {
-                    iconUrls.add(s3Service.presignIcon(a.getUrl()));
+                    iconUrls.add(a.getUrl());
                 }
             }
         }

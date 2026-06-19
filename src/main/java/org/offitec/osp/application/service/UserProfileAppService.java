@@ -96,10 +96,6 @@ public class UserProfileAppService {
         if (user instanceof org.offitec.osp.domain.entity.Admin admin) {
             surname = admin.getSurname();
         }
-        String signedImageUrl = null;
-        if (user.getImageUrl() != null) {
-            signedImageUrl = s3Service.presignUserPicture(user.getImageUrl());
-        }
         return new org.offitec.osp.presentation.dto.UserProfileDTO(
             user.getId(),
             user.getUsername(),
@@ -112,7 +108,7 @@ public class UserProfileAppService {
             user.getCategory(),
             user.getCreatedAt(),
             user.getStatus(),
-            signedImageUrl
+            user.getImageUrl()
         );
     }
 }

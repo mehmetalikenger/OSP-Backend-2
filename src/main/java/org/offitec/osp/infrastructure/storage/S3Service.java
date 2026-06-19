@@ -130,9 +130,13 @@ public class S3Service {
         return publicBaseUrl + "/" + key;
     }
 
+    private static final long OPTIMIZE_THRESHOLD_BYTES = 300 * 1024; // skip optimization under 300 KB
+
     // Returns optimized bytes, or null when the file should be stored as-is
-    // (non-raster type, undecodable, or when optimizing wouldn't save space).
+    // (non-raster type, undecodable, already small, or when optimizing wouldn't save space).
     private byte[] optimizeImage(MultipartFile file) throws IOException {
+        if (file.getSize() < OPTIMIZE_THRESHOLD_BYTES) return null;
+
         String contentType = file.getContentType();
         String format;
         if ("image/jpeg".equalsIgnoreCase(contentType)) {

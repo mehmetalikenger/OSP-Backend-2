@@ -235,15 +235,7 @@ public class UnitAppService {
         r.setChassisId(ts.getChassis() != null ? ts.getChassis().getId() : null);
 
         List<UnitAssetDTO> assets = unitAssetRepository.findByUnitId(id).stream()
-                .map(a -> {
-                    String signedUrl = switch (a.getAssetType()) {
-                        case IMAGE    -> s3Service.presignImage(a.getUrl());
-                        case DRAWING  -> s3Service.presignTechnicalImage(a.getUrl());
-                        case ICON     -> s3Service.presignIcon(a.getUrl());
-                        case DOCUMENT -> s3Service.presignDocument(a.getUrl());
-                    };
-                    return new UnitAssetDTO(a.getId(), signedUrl, a.getAssetType().name(), a.isPrimary());
-                })
+                .map(a -> new UnitAssetDTO(a.getId(), a.getUrl(), a.getAssetType().name(), a.isPrimary()))
                 .collect(Collectors.toList());
         r.setAssets(assets);
 
@@ -441,15 +433,7 @@ public class UnitAppService {
         r.setModes(modes);
 
         List<UnitAssetDTO> assets = unitAssetRepository.findByUnitId(id).stream()
-                .map(a -> {
-                    String signedUrl = switch (a.getAssetType()) {
-                        case IMAGE    -> s3Service.presignImage(a.getUrl());
-                        case DRAWING  -> s3Service.presignTechnicalImage(a.getUrl());
-                        case ICON     -> s3Service.presignIcon(a.getUrl());
-                        case DOCUMENT -> s3Service.presignDocument(a.getUrl());
-                    };
-                    return new UnitAssetDTO(a.getId(), signedUrl, a.getAssetType().name(), a.isPrimary());
-                })
+                .map(a -> new UnitAssetDTO(a.getId(), a.getUrl(), a.getAssetType().name(), a.isPrimary()))
                 .collect(Collectors.toList());
         r.setAssets(assets);
 
