@@ -24,9 +24,6 @@ public class UnitModeSpecsDTO {
     @NotNull(message = "Expansion valve must be selected.")
     public Long expansionValveSpecsId;
 
-    @NotNull(message = "Chassis must be selected.")
-    public Long chassisId;
-
     // Optional (heat pumps may use it; not required)
     public Long fourWayReversingValveSpecsId;
 }

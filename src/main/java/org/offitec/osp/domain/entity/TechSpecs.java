@@ -48,8 +48,4 @@ public class TechSpecs {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "four_way_reversing_valve_specs_id")
     private FourWayReversingValveSpecs fourWayReversingValveSpecs;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "chassis_id")
-    private Chassis chassis;
 }

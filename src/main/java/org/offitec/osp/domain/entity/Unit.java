@@ -58,6 +58,11 @@ public class Unit {
     @JoinColumn(name = "refrigerant_id")
     private Refrigerant refrigerant;
 
+    // Chassis is a unit-level selection (shared across all modes), like the refrigerant.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "chassis_id")
+    private Chassis chassis;
+
     @Column(name = "fan_pi")
     private double fanPI;
 

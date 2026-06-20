@@ -20,7 +20,6 @@ public class HeatPumpModeDTO {
     private Long evaporatorSpecsId;
     private Long expansionValveSpecsId;
     private Long fourWayReversingValveSpecsId;
-    private Long chassisId;
 
     private double ambient;
     private double evapIn;

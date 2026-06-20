@@ -373,7 +373,7 @@ public class UnitAppService {
         r.setEvaporatorSpecsId(ts.getEvaporatorSpecs() != null ? ts.getEvaporatorSpecs().getId() : null);
         r.setExpansionValveSpecsId(ts.getExpansionValveSpecs() != null ? ts.getExpansionValveSpecs().getId() : null);
         r.setFourWayReversingValveSpecsId(ts.getFourWayReversingValveSpecs() != null ? ts.getFourWayReversingValveSpecs().getId() : null);
-        r.setChassisId(ts.getChassis() != null ? ts.getChassis().getId() : null);
+        r.setChassisId(unit.getChassis() != null ? unit.getChassis().getId() : null);
 
         List<UnitAssetDTO> assets = unitAssetRepository.findByUnitId(id).stream()
                 .map(a -> new UnitAssetDTO(a.getId(), a.getUrl(), a.getAssetType().name(), a.isPrimary()))
@@ -562,7 +562,6 @@ public class UnitAppService {
                 m.setEvaporatorSpecsId(ts.getEvaporatorSpecs() != null ? ts.getEvaporatorSpecs().getId() : null);
                 m.setExpansionValveSpecsId(ts.getExpansionValveSpecs() != null ? ts.getExpansionValveSpecs().getId() : null);
                 m.setFourWayReversingValveSpecsId(ts.getFourWayReversingValveSpecs() != null ? ts.getFourWayReversingValveSpecs().getId() : null);
-                m.setChassisId(ts.getChassis() != null ? ts.getChassis().getId() : null);
                 m.setAmbient(cv.getAmbient());
                 m.setEvapIn(cv.getEvapIn());
                 m.setEvapOut(cv.getEvapOut());
@@ -571,6 +570,7 @@ public class UnitAppService {
                 modes.add(m);
             }
         }
+        r.setChassisId(unit.getChassis() != null ? unit.getChassis().getId() : null);
         r.setModes(modes);
 
         List<UnitAssetDTO> assets = unitAssetRepository.findByUnitId(id).stream()
@@ -632,6 +632,8 @@ public class UnitAppService {
         unit.setExpansionValveQty(d.getExpansionValveQty());
         unit.setRefrigerant(refrigerantRepository.findById(d.getRefrigerantId())
                 .orElseThrow(() -> new RefrigerantDoesntExistException("Selected refrigerant doesn't exist.")));
+        unit.setChassis(chassisRepository.findById(d.getChassisId())
+                .orElseThrow(() -> new ChassisDoesntExistException("Selected chassis doesn't exist.")));
         unit.setFanPI(d.getFanPI());
         unit.setWidth(d.getWidth());
         unit.setLength(d.getLength());
@@ -660,8 +662,6 @@ public class UnitAppService {
                 .orElseThrow(() -> new EvaporatorSpecsDoesntExistException("Selected evaporator doesn't exist.")));
         ts.setExpansionValveSpecs(expansionValveSpecsRepository.findById(d.getExpansionValveSpecsId())
                 .orElseThrow(() -> new ExpansionValveSpecsDoesntExistException("Selected expansion valve doesn't exist.")));
-        ts.setChassis(chassisRepository.findById(d.getChassisId())
-                .orElseThrow(() -> new ChassisDoesntExistException("Selected chassis doesn't exist.")));
 
         if (d.getFourWayReversingValveSpecsId() != null) {
             ts.setFourWayReversingValveSpecs(fourWayReversingValveSpecsRepository.findById(d.getFourWayReversingValveSpecsId())
@@ -679,6 +679,8 @@ public class UnitAppService {
         unit.setExpansionValveQty(d.getExpansionValveQty());
         unit.setRefrigerant(refrigerantRepository.findById(d.getRefrigerantId())
                 .orElseThrow(() -> new RefrigerantDoesntExistException("Selected refrigerant doesn't exist.")));
+        unit.setChassis(chassisRepository.findById(d.getChassisId())
+                .orElseThrow(() -> new ChassisDoesntExistException("Selected chassis doesn't exist.")));
         unit.setFanPI(d.getFanPI());
         unit.setWidth(d.getWidth());
         unit.setLength(d.getLength());
@@ -706,8 +708,6 @@ public class UnitAppService {
                 .orElseThrow(() -> new EvaporatorSpecsDoesntExistException("Selected evaporator doesn't exist.")));
         ts.setExpansionValveSpecs(expansionValveSpecsRepository.findById(d.getExpansionValveSpecsId())
                 .orElseThrow(() -> new ExpansionValveSpecsDoesntExistException("Selected expansion valve doesn't exist.")));
-        ts.setChassis(chassisRepository.findById(d.getChassisId())
-                .orElseThrow(() -> new ChassisDoesntExistException("Selected chassis doesn't exist.")));
 
         if (d.getFourWayReversingValveSpecsId() != null) {
             ts.setFourWayReversingValveSpecs(fourWayReversingValveSpecsRepository.findById(d.getFourWayReversingValveSpecsId())

@@ -14,6 +14,9 @@ public class UnitCommonSpecsDTO {
     @NotNull(message = "Refrigerant must be selected.")
     public Long refrigerantId;
 
+    @NotNull(message = "Chassis must be selected.")
+    public Long chassisId;
+
     public double fanPI;
     public double width;
     public double length;

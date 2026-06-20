@@ -23,6 +23,7 @@ public class HeatPumpResponseDTO {
     private int condenserQty;
     private int expansionValveQty;
     private Long refrigerantId;
+    private Long chassisId;
     private double fanPI;
     private double width;
     private double length;
