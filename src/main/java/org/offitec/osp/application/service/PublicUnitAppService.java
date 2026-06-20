@@ -26,7 +26,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -59,10 +61,11 @@ public class PublicUnitAppService {
     @Transactional(readOnly = true)
     public List<UnitCardDTO> getUnitsByType(UnitCategory category, UnitTypeEnum unitType) {
         Long userId = currentUserId();
-        return unitJpaRepository.findByCategoryAndUnitType(category, unitType).stream()
-                .filter(u -> !u.isDeleted())
-                .map(u -> toCard(u, userId))
-                .collect(Collectors.toList());
+        // Query 1: the cards (scalar fields + primary image + saved flag), one statement.
+        List<UnitCardDTO> cards = unitJpaRepository.findCards(category, unitType, userId);
+        // Query 2: per-mode capacities for all those units at once, stitched in below.
+        applyCapacities(cards);
+        return cards;
     }
 
     // --- Detail ---
@@ -102,13 +105,9 @@ public class PublicUnitAppService {
     @Transactional(readOnly = true)
     public List<UnitCardDTO> getSavedUnits(UnitCategory category, UnitTypeEnum unitType) {
         Long userId = currentUserId();
-        return savedUnitRepository.findByUserId(userId).stream()
-                .map(SavedUnit::getUnit)
-                .filter(u -> !u.isDeleted()
-                        && (category == null || u.getCategory() == category)
-                        && (unitType == null || u.getUnitType() == unitType))
-                .map(u -> toCard(u, userId))
-                .collect(Collectors.toList());
+        List<UnitCardDTO> cards = unitJpaRepository.findSavedCards(userId, category, unitType);
+        applyCapacities(cards);
+        return cards;
     }
 
     // --- Calculation page data ---
@@ -248,33 +247,66 @@ public class PublicUnitAppService {
 
     // --- Mapping helpers ---
 
-    private UnitCardDTO toCard(Unit unit, Long userId) {
-        String primaryImageUrl = null;
-        List<UnitAsset> assets = unit.getAssets();
-        if (assets != null) {
-            for (UnitAsset a : assets) {
-                if (a.getAssetType() == AssetType.IMAGE && a.isPrimary()) {
-                    primaryImageUrl = a.getUrl();
-                    break;
-                }
+    // A unit's capacity for one mode. Used to format the capacity label the same way
+    // for both the catalog cards and the detail/spec views.
+    private record ModeCapacity(Mod mod, double capacity) {}
+
+    // Fills each card's capacity from a SINGLE batched query over all the units'
+    // modes, instead of touching the database once per unit (which was the N+1).
+    private void applyCapacities(List<UnitCardDTO> cards) {
+        if (cards.isEmpty()) return;
+
+        List<Long> unitIds = cards.stream().map(UnitCardDTO::getId).collect(Collectors.toList());
+
+        // Group the flat (unitId, mod, capacity) rows by unit id.
+        Map<Long, List<ModeCapacity>> byUnit = unitDetailsRepository.findModeCapacitiesByUnitIds(unitIds)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        row -> (Long) row[0],
+                        Collectors.mapping(
+                                row -> new ModeCapacity((Mod) row[1], ((Number) row[2]).doubleValue()),
+                                Collectors.toList())));
+
+        for (UnitCardDTO card : cards) {
+            card.setCapacityRange(formatCapacity(byUnit.get(card.getId())));
+        }
+    }
+
+    // Per-mode capacity from a loaded unit (used by the detail/spec views, which
+    // already have the UnitDetails graph in hand).
+    private String capacityFromUnit(Unit unit) {
+        if (unit.getUnitDetails() == null) return null;
+        List<ModeCapacity> modes = new ArrayList<>();
+        for (UnitDetails d : unit.getUnitDetails()) {
+            if (d.getTechSpecs() != null) {
+                modes.add(new ModeCapacity(d.getMod(), d.getTechSpecs().getCapacity()));
             }
         }
+        return formatCapacity(modes);
+    }
 
-        String capacityRange = buildCapacityRange(unit);
-        String refrigerant = unit.getRefrigerant() != null ? unit.getRefrigerant().getCode() : null;
-        boolean saved = userId != null && savedUnitRepository.existsByUserIdAndUnitId(userId, unit.getId());
+    // Single mode -> "38.0 kW". Multiple modes -> "45.0 kW (Heating), 38.0 kW (Cooling)"
+    // with Heating listed first.
+    private String formatCapacity(List<ModeCapacity> modes) {
+        if (modes == null || modes.isEmpty()) return null;
 
-        return new UnitCardDTO(
-                unit.getId(),
-                unit.getName(),
-                unit.getModel(),
-                primaryImageUrl,
-                capacityRange,
-                refrigerant,
-                unit.getUnitType().name(),
-                unit.getCategory().name(),
-                saved
-        );
+        if (modes.size() == 1) {
+            return String.format("%.1f kW", modes.get(0).capacity());
+        }
+
+        return modes.stream()
+                .sorted(Comparator.comparingInt(m -> modeOrder(m.mod())))
+                .map(m -> String.format("%.1f kW (%s)", m.capacity(), modeLabel(m.mod())))
+                .collect(Collectors.joining(", "));
+    }
+
+    private int modeOrder(Mod mod) {
+        return mod == Mod.HEATING ? 0 : 1; // Heating before Cooling
+    }
+
+    private String modeLabel(Mod mod) {
+        String lower = mod.name().toLowerCase();
+        return Character.toUpperCase(lower.charAt(0)) + lower.substring(1); // Heating / Cooling
     }
 
     private UnitDetailPublicDTO toDetail(Unit unit, Long userId) {
@@ -309,26 +341,10 @@ public class PublicUnitAppService {
         );
     }
 
-    private String buildCapacityRange(Unit unit) {
-        if (unit.getUnitDetails() == null || unit.getUnitDetails().isEmpty()) return null;
-        double min = Double.MAX_VALUE;
-        double max = Double.MIN_VALUE;
-        for (UnitDetails d : unit.getUnitDetails()) {
-            if (d.getTechSpecs() != null) {
-                double cap = d.getTechSpecs().getCapacity();
-                if (cap < min) min = cap;
-                if (cap > max) max = cap;
-            }
-        }
-        if (min == Double.MAX_VALUE) return null;
-        if (min == max) return String.format("%.1f kW", min);
-        return String.format("%.1f to %.1f kW", min, max);
-    }
-
     private List<TechSpecItemDTO> buildSpecs(Unit unit) {
         List<TechSpecItemDTO> specs = new ArrayList<>();
 
-        addSpec(specs, "Capacity", buildCapacityRange(unit));
+        addSpec(specs, "Capacity", capacityFromUnit(unit));
 
         if (unit.getUnitDetails() != null) {
             for (UnitDetails d : unit.getUnitDetails()) {
