@@ -6,6 +6,9 @@ import org.offitec.osp.presentation.dto.ChillerResponseDTO;
 import org.offitec.osp.presentation.dto.ChillerSummaryDTO;
 import org.offitec.osp.presentation.dto.ChillerWrapperDTO;
 import org.offitec.osp.presentation.dto.AssetUploadDTO;
+import org.offitec.osp.presentation.dto.AssetPresignRequestDTO;
+import org.offitec.osp.presentation.dto.AssetPresignResponseDTO;
+import org.offitec.osp.presentation.dto.AssetConfirmRequestDTO;
 import org.offitec.osp.presentation.dto.HeatPumpDetailsWrapperDTO;
 import org.offitec.osp.presentation.dto.HeatPumpModelWrapperDTO;
 import org.offitec.osp.presentation.dto.HeatPumpResponseDTO;
@@ -68,6 +71,22 @@ public class UnitController {
     @PostMapping(value = "/{unitId}/upload-assets", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public HttpStatus uploadAssets(@PathVariable Long unitId, @ModelAttribute AssetUploadDTO dto) {
         unitAppService.uploadAssets(unitId, dto);
+        return HttpStatus.OK;
+    }
+
+    // --- Direct client upload (presigned PUT to R2) ---
+
+    // Step 1: validate the requested files and hand back short-lived presigned PUT URLs.
+    @PostMapping("/{unitId}/assets/presign")
+    public ResponseEntity<AssetPresignResponseDTO> presignAssets(@PathVariable Long unitId,
+                                                                 @RequestBody AssetPresignRequestDTO dto) {
+        return ResponseEntity.ok(unitAppService.presignAssets(unitId, dto));
+    }
+
+    // Step 2: after the browser uploaded straight to R2, record the assets.
+    @PostMapping("/{unitId}/assets/confirm")
+    public HttpStatus confirmAssets(@PathVariable Long unitId, @RequestBody AssetConfirmRequestDTO dto) {
+        unitAppService.confirmAssets(unitId, dto);
         return HttpStatus.OK;
     }
 

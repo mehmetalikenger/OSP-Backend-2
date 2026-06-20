@@ -18,6 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -163,9 +164,149 @@ public class UnitAppService {
     }
 
     private String buildKey(Long unitId, MultipartFile file) {
-        String name = file.getOriginalFilename();
-        name = (name == null || name.isBlank()) ? "file" : name.replaceAll("\\s+", "_");
+        return buildKey(unitId, file.getOriginalFilename());
+    }
+
+    private String buildKey(Long unitId, String filename) {
+        String name = (filename == null || filename.isBlank()) ? "file" : filename.replaceAll("\\s+", "_");
         return unitId + "/" + UUID.randomUUID() + "-" + name;
+    }
+
+    // --- Direct client upload (presigned PUT) ---
+    //
+    // Two-step flow that lets the browser upload straight to R2:
+    //   presignAssets  -> validate + hand out short-lived PUT URLs (key chosen here)
+    //   confirmAssets  -> verify the uploaded objects and persist UnitAsset rows
+    // The backend never sees the bytes, but still owns the object key and re-checks
+    // type/size/key-prefix so a client can't register arbitrary or oversized objects.
+
+    private static final long MAX_ASSET_BYTES = 25L * 1024 * 1024; // 25 MB per file
+
+    private static final Set<String> RASTER_IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
+    private static final Set<String> ICON_TYPES = Set.of("image/png", "image/svg+xml", "image/x-icon", "image/vnd.microsoft.icon");
+    private static final Set<String> DOCUMENT_TYPES = Set.of(
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+
+    private Set<String> allowedTypes(AssetType type) {
+        return switch (type) {
+            case IMAGE, DRAWING -> RASTER_IMAGE_TYPES;
+            case ICON -> ICON_TYPES;
+            case DOCUMENT -> DOCUMENT_TYPES;
+        };
+    }
+
+    // Storage prefix each asset type lives under (mirrors S3Service's PREFIX_* values).
+    private String prefixFor(AssetType type) {
+        return switch (type) {
+            case IMAGE -> "unit-images";
+            case DRAWING -> "technical-images";
+            case ICON -> "icons";
+            case DOCUMENT -> "documents";
+        };
+    }
+
+    @Transactional(readOnly = true)
+    public AssetPresignResponseDTO presignAssets(Long unitId, AssetPresignRequestDTO request) {
+        // Confirms the unit exists (and that the caller, already an authenticated admin,
+        // is targeting a real unit) before minting any upload URLs.
+        unitJpaRepository.findById(unitId)
+                .orElseThrow(() -> new UnitDoesntExistException("Unit doesn't exist."));
+
+        if (request.getFiles() == null || request.getFiles().isEmpty()) {
+            return new AssetPresignResponseDTO(List.of());
+        }
+
+        List<AssetPresignResponseDTO.Item> tickets = new ArrayList<>();
+        for (AssetPresignRequestDTO.Item file : request.getFiles()) {
+            validateUploadRequest(file);
+            String contentType = file.getContentType().toLowerCase();
+            String key = buildKey(unitId, file.getFilename());
+            S3Service.PresignedUpload presigned = switch (file.getType()) {
+                case IMAGE -> s3Service.presignImageUpload(key, contentType);
+                case DRAWING -> s3Service.presignTechnicalImageUpload(key, contentType);
+                case ICON -> s3Service.presignIconUpload(key, contentType);
+                case DOCUMENT -> s3Service.presignDocumentUpload(key, contentType);
+            };
+            tickets.add(new AssetPresignResponseDTO.Item(file.getClientId(), presigned.uploadUrl(), presigned.key()));
+        }
+        return new AssetPresignResponseDTO(tickets);
+    }
+
+    private void validateUploadRequest(AssetPresignRequestDTO.Item file) {
+        if (file.getType() == null) {
+            throw new InvalidAssetException("Asset type is required.");
+        }
+        if (file.getSize() <= 0 || file.getSize() > MAX_ASSET_BYTES) {
+            throw new InvalidAssetException("Each file must be between 1 byte and 25 MB.");
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !allowedTypes(file.getType()).contains(contentType.toLowerCase())) {
+            throw new InvalidAssetException("Unsupported file type for " + file.getType() + ": " + contentType);
+        }
+    }
+
+    @Transactional
+    public void confirmAssets(Long unitId, AssetConfirmRequestDTO request) {
+        Unit unit = unitJpaRepository.findById(unitId)
+                .orElseThrow(() -> new UnitDoesntExistException("Unit doesn't exist."));
+
+        if (request.getFiles() == null || request.getFiles().isEmpty()) {
+            return;
+        }
+
+        // If a new primary image is being registered, demote the current one first
+        // (same behaviour as the old multipart uploadAssets path).
+        boolean settingPrimary = request.getFiles().stream()
+                .anyMatch(f -> f.isPrimary() && f.getType() == AssetType.IMAGE);
+        if (settingPrimary) {
+            unitAssetRepository.findByUnitId(unitId).stream()
+                    .filter(a -> a.getAssetType() == AssetType.IMAGE && a.isPrimary())
+                    .forEach(a -> { a.setPrimary(false); unitAssetRepository.save(a); });
+        }
+
+        for (AssetConfirmRequestDTO.Item file : request.getFiles()) {
+            String key = validateConfirmKey(unitId, file);
+            verifyUploadedObject(file.getType(), key);
+            boolean primary = file.isPrimary() && file.getType() == AssetType.IMAGE;
+            persistAsset(unit, file.getType(), s3Service.publicUrl(key), primary);
+        }
+    }
+
+    // The client must hand back a key the backend itself issued: it has to sit under
+    // this unit's prefix for the declared type. Rejects attempts to attach arbitrary
+    // or cross-unit objects.
+    private String validateConfirmKey(Long unitId, AssetConfirmRequestDTO.Item file) {
+        if (file.getType() == null || file.getKey() == null) {
+            throw new InvalidAssetException("Asset key and type are required.");
+        }
+        String expectedPrefix = prefixFor(file.getType()) + "/" + unitId + "/";
+        if (!file.getKey().startsWith(expectedPrefix)) {
+            throw new InvalidAssetException("Asset key is not valid for this unit.");
+        }
+        return file.getKey();
+    }
+
+    // Defense in depth: confirm the object actually exists in storage and that its
+    // real (server-observed) size and content type are within the allowed bounds.
+    // If not, the object is removed and the confirmation is rejected.
+    private void verifyUploadedObject(AssetType type, String key) {
+        com.amazonaws.services.s3.model.ObjectMetadata meta;
+        try {
+            meta = s3Service.statObject(key);
+        } catch (Exception e) {
+            throw new InvalidAssetException("Uploaded file was not found in storage: " + key);
+        }
+        boolean tooBig = meta.getContentLength() > MAX_ASSET_BYTES;
+        String contentType = meta.getContentType();
+        boolean badType = contentType == null || !allowedTypes(type).contains(contentType.toLowerCase());
+        if (tooBig || badType) {
+            try { s3Service.deleteByKey(key); } catch (Exception ignored) { /* best effort cleanup */ }
+            throw new InvalidAssetException("Uploaded file failed validation (size or type).");
+        }
     }
 
     // --- Read ---

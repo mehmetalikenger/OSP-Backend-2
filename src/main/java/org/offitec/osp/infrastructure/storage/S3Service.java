@@ -1,6 +1,8 @@
 package org.offitec.osp.infrastructure.storage;
 
+import com.amazonaws.HttpMethod;
 import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import net.coobird.thumbnailator.Thumbnails;
@@ -66,6 +68,61 @@ public class S3Service {
     public String presignIcon(String url)           { return presign(url); }
     public String presignDocument(String url)       { return presign(url); }
     public String presignUserPicture(String url)    { return presign(url); }
+
+    // ---- Direct client upload (presigned PUT) ----
+    //
+    // Lets the browser upload straight to R2 without the bytes passing through the
+    // backend. The backend still decides the object key (so a client can't write to
+    // arbitrary paths) and the URL is short-lived. NOTE: raster images uploaded this
+    // way are NOT server-optimized — the client resizes before uploading instead.
+
+    private static final long PUT_URL_TTL_MS = 10 * 60 * 1000L; // 10 minutes
+
+    // Returned to the caller: where the client PUTs the bytes, the public URL the
+    // object will have once uploaded, and the full storage key (used at confirm time).
+    public record PresignedUpload(String uploadUrl, String publicUrl, String key) {}
+
+    public PresignedUpload presignImageUpload(String key, String contentType)          { return presignPut(PREFIX_IMAGES + "/" + key, contentType); }
+    public PresignedUpload presignTechnicalImageUpload(String key, String contentType) { return presignPut(PREFIX_TECHNICAL + "/" + key, contentType); }
+    public PresignedUpload presignIconUpload(String key, String contentType)           { return presignPut(PREFIX_ICONS + "/" + key, contentType); }
+    public PresignedUpload presignDocumentUpload(String key, String contentType)       { return presignPut(PREFIX_DOCUMENTS + "/" + key, contentType); }
+
+    private PresignedUpload presignPut(String fullKey, String contentType) {
+        try {
+            java.util.Date expiration = new java.util.Date(System.currentTimeMillis() + PUT_URL_TTL_MS);
+            GeneratePresignedUrlRequest request = new GeneratePresignedUrlRequest(bucket, fullKey)
+                    .withMethod(HttpMethod.PUT)
+                    .withExpiration(expiration);
+            // Binding the content type into the signature forces the client's PUT to
+            // send the same Content-Type it declared when requesting the URL.
+            if (contentType != null && !contentType.isBlank()) {
+                request.setContentType(contentType);
+            }
+            String url = storage.generatePresignedUrl(request).toString();
+            return new PresignedUpload(url, publicBaseUrl + "/" + fullKey, fullKey);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to presign upload: " + fullKey, e);
+        }
+    }
+
+    // Public URL for an already-known full storage key (the value stored on UnitAsset).
+    public String publicUrl(String fullKey) {
+        return publicBaseUrl + "/" + fullKey;
+    }
+
+    // HEAD the object; throws if it does not exist. Used at confirm time to verify a
+    // client-claimed upload actually landed and to read back its real size/content type.
+    public ObjectMetadata statObject(String fullKey) {
+        return storage.getObjectMetadata(bucket, fullKey);
+    }
+
+    public void deleteByKey(String fullKey) {
+        try {
+            storage.deleteObject(bucket, fullKey);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to delete object: " + fullKey, e);
+        }
+    }
 
     private String presign(String url) {
         try {

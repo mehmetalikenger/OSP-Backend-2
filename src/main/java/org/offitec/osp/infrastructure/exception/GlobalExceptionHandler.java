@@ -44,6 +44,12 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(Map.of("message", "Invalid value provided."), HttpStatus.BAD_REQUEST);
     }
 
+    @ExceptionHandler(InvalidAssetException.class)
+    public ResponseEntity<Map<String, String>> handleInvalidAssetException(RuntimeException ex){
+
+        return new ResponseEntity<>(Map.of("message", ex.getMessage()), HttpStatus.BAD_REQUEST);
+    }
+
     // --- 409 Conflict: resource already exists ---
 
     @ExceptionHandler(AdminAlreadyExistsException.class)
