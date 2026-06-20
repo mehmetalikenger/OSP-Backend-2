@@ -33,7 +33,7 @@ spring:
       access-key: ${R2_ACCESS_KEY}
       secret-key: ${R2_SECRET_KEY}
       region: auto
-      endpoint: https://c0c51a06f0c819ad0fd3ff0776d7ce26.r2.cloudflarestorage.com/osp-asset
+      endpoint: https://c0c51a06f0c819ad0fd3ff0776d7ce26.r2.cloudflarestorage.com
       bucket-name: osp-asset
       public-base-url: ${R2_PUBLIC_BASE_URL}
 
