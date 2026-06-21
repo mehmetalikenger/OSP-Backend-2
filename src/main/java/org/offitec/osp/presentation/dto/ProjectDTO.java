@@ -11,13 +11,17 @@ public record ProjectDTO(
         String country,
         String city,
         String phone,
+        String createdAt,
+        String updatedAt,
         List<ProjectDetailDTO> details
 ) {
     /** One added unit-calculation inside a project. */
     public record ProjectDetailDTO(
             Long id,
             Long unitId,
+            String unitName,
             String unitModel,
+            String primaryImageUrl,
             double ambient,
             double evapIn,
             double evapOut,

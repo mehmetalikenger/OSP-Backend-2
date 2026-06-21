@@ -1,5 +1,7 @@
 package org.offitec.osp.report;
 
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.junit.jupiter.api.Test;
 import org.offitec.osp.application.report.PdfReportService;
 import org.offitec.osp.application.report.UnitReportModel;
@@ -23,12 +25,51 @@ class PdfReportRenderTest {
         PdfReportService service = new PdfReportService(
                 new WorkingLimitSvgBuilder(), new PressureDropSvgBuilder());
 
-        UnitReportModel model = UnitReportModel.builder()
+        UnitReportModel model = baseModel()
                 .projectName("Istanbul Data Center")
                 .responsiblePerson("Mehmet Yilmaz")
+                .country("Turkey").city("Istanbul").address("Mall of Istanbul, Basaksehir")
+                .build();
+
+        byte[] pdf = service.render(model);
+
+        Path out = Path.of("target/sample-report.pdf");
+        Files.write(out, pdf);
+
+        assertTrue(pdf.length > 1000, "PDF should be non-trivial in size");
+        assertTrue(pdf[0] == '%' && pdf[1] == 'P' && pdf[2] == 'D' && pdf[3] == 'F',
+                "Output should start with the %PDF magic header");
+        System.out.println("Wrote sample PDF: " + out.toAbsolutePath() + " (" + pdf.length + " bytes)");
+    }
+
+    @Test
+    void rendersTurkishCharacters() throws Exception {
+        PdfReportService service = new PdfReportService(
+                new WorkingLimitSvgBuilder(), new PressureDropSvgBuilder());
+
+        UnitReportModel model = baseModel()
+                .projectName("İzmir Soğutma Projesi")
+                .responsiblePerson("Şükrü Çağlayan")
+                .city("İzmir").country("Türkiye")
+                .address("Çiğli, İzmir")
+                .build();
+
+        byte[] pdf = service.render(model);
+        Files.write(Path.of("target/turkish-report.pdf"), pdf);
+
+        try (PDDocument doc = PDDocument.load(pdf)) {
+            String text = new PDFTextStripper().getText(doc);
+            System.out.println("EXTRACTED >>>\n" + text + "\n<<< END");
+            assertTrue(text.contains("İzmir"), "Turkish 'İzmir' should appear; got: " + text);
+            assertTrue(text.contains("Türkiye"), "Turkish 'Türkiye' should appear; got: " + text);
+        }
+    }
+
+    // Shared technical model; tests set the project-specific (locale-sensitive) fields.
+    private static UnitReportModel.UnitReportModelBuilder baseModel() {
+        return UnitReportModel.builder()
                 .email("sametoffitec2026@gmail.com")
                 .phone("+90 216 642 70 42")
-                .country("Turkey").city("Istanbul").address("Mall of Istanbul, Basaksehir")
                 .printedDate("Saturday, 21 June 2026")
                 .model("EAS 1102 - V0 - Standard Version")
                 .category("Air Cooled Chiller")
@@ -56,18 +97,7 @@ class PdfReportRenderTest {
                         .minAmbient(-10).maxAmbient(52)
                         .pointWaterOutlet(7).pointAmbient(35).build())
                 .pressureCurve(UnitReportModel.PressureCurve.builder()
-                        .designFlowRate(18.26).designPressureDrop(50).build())
-                .build();
-
-        byte[] pdf = service.render(model);
-
-        Path out = Path.of("target/sample-report.pdf");
-        Files.write(out, pdf);
-
-        assertTrue(pdf.length > 1000, "PDF should be non-trivial in size");
-        assertTrue(pdf[0] == '%' && pdf[1] == 'P' && pdf[2] == 'D' && pdf[3] == 'F',
-                "Output should start with the %PDF magic header");
-        System.out.println("Wrote sample PDF: " + out.toAbsolutePath() + " (" + pdf.length + " bytes)");
+                        .designFlowRate(18.26).designPressureDrop(50).build());
     }
 
     private static UnitReportModel.FullLoadRow row(String a, String cap, String pow, String eer) {

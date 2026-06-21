@@ -9,13 +9,20 @@ import org.offitec.osp.infrastructure.storage.S3Service;
 import org.offitec.osp.presentation.dto.AddToProjectDTO;
 import org.offitec.osp.presentation.dto.CreateProjectDTO;
 import org.offitec.osp.presentation.dto.ProjectDTO;
+import org.offitec.osp.presentation.dto.UpdateProjectDTO;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * Project management: create projects, list the current user's projects, and add
@@ -123,17 +130,83 @@ public class ProjectAppService {
         // Adding to a project is the only flow that persists a report: render it,
         // store it in R2, and keep the URL on the ProjectDetails row.
         String pdfUrl = reportAppService.renderAndStore(
-                unit, mod, dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(), project.getUser());
+                unit, mod, dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(), project, project.getUser());
 
         ProjectDetails pd = new ProjectDetails();
         pd.setProject(project);
         pd.setUnit(unit);
         pd.setCustomCalculationValues(inputs);   // cascade ALL persists these
         pd.setCalculationOutputValues(outputs);
+        pd.setMod(mod);                          // remembered so the report can be regenerated
         pd.setPdfUrl(pdfUrl);
         projectDetailsRepository.save(pd);
 
         return toDTO(project, projectDetailsRepository.findByProjectId(project.getId()));
+    }
+
+    /**
+     * Updates a project's name and contact/address info, then regenerates every stored
+     * report so each PDF reflects the new project details. Each report is re-rendered
+     * from its detail's saved custom calculation values, reproducing the exact same
+     * numbers — only the project info on the report changes.
+     */
+    @Transactional
+    public ProjectDTO update(Long projectId, UpdateProjectDTO dto) {
+        Project project = requireOwnedProject(projectId);
+
+        // Ignore a blank name so the project is never left unnamed; everything else is
+        // taken as-is (an empty value clears that field).
+        if (dto.getName() != null && !dto.getName().isBlank()) {
+            project.setName(dto.getName().trim());
+        }
+        project.setAddress(dto.getAddress());
+        project.setCountry(dto.getCountry());
+        project.setCity(dto.getCity());
+        project.setPhone(dto.getPhone());
+        project = projectRepository.save(project); // @PreUpdate bumps updatedAt
+
+        for (ProjectDetails d : projectDetailsRepository.findByProjectId(projectId)) {
+            regenerateReport(project, d);
+        }
+        return toDTO(project, projectDetailsRepository.findByProjectId(projectId));
+    }
+
+    /**
+     * Deletes a project and everything under it: each detail's stored report is removed
+     * from R2, the detail rows are deleted (there's no Project->details cascade, so this is
+     * explicit), then the project itself.
+     */
+    @Transactional
+    public void delete(Long projectId) {
+        Project project = requireOwnedProject(projectId);
+        List<ProjectDetails> details = projectDetailsRepository.findByProjectId(projectId);
+        for (ProjectDetails d : details) {
+            String pdfUrl = d.getPdfUrl();
+            if (pdfUrl != null && !pdfUrl.isBlank()) {
+                s3Service.deleteReport(pdfUrl);
+            }
+        }
+        projectDetailsRepository.deleteAll(details);
+        projectRepository.delete(project);
+    }
+
+    // Re-renders one detail's report with the project's current info, reusing the saved
+    // inputs, and swaps the stored PDF (deleting the old object only after the new one is up).
+    private void regenerateReport(Project project, ProjectDetails d) {
+        Unit unit = d.getUnit();
+        CustomCalculationValues in = d.getCustomCalculationValues();
+        if (unit == null || in == null) return;
+
+        Mod mod = d.getMod() == null ? Mod.COOLING : d.getMod();
+        String oldUrl = d.getPdfUrl();
+        String newUrl = reportAppService.renderAndStore(
+                unit, mod, in.getAmbient(), in.getEvapIn(), in.getEvapOut(), project, project.getUser());
+        d.setPdfUrl(newUrl);
+        projectDetailsRepository.save(d);
+
+        if (oldUrl != null && !oldUrl.isBlank()) {
+            s3Service.deleteReport(oldUrl);
+        }
     }
 
     // Removes a single detail row (one unit-evaluation). Because a unit can appear in a
@@ -141,6 +214,7 @@ public class ProjectAppService {
     @Transactional
     public ProjectDTO removeDetail(Long projectId, Long detailId) {
         Project project = requireOwnedProject(projectId);
+        boolean[] removed = {false};
         // Scope the delete to this project so a detail id from another project can't be removed.
         projectDetailsRepository.findById(detailId)
                 .filter(d -> d.getProject().getId().equals(projectId))
@@ -153,21 +227,34 @@ public class ProjectAppService {
                     if (pdfUrl != null && !pdfUrl.isBlank()) {
                         s3Service.deleteReport(pdfUrl);
                     }
+                    removed[0] = true;
                 });
+        // Removing a unit changes the project, so reflect that in its update date.
+        if (removed[0]) {
+            project.setUpdatedAt(LocalDateTime.now());
+            projectRepository.save(project);
+        }
         return toDTO(project, projectDetailsRepository.findByProjectId(projectId));
     }
 
     // --- mapping & helpers ---
 
+    private static final DateTimeFormatter PROJECT_DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
     private ProjectDTO toDTO(Project p, List<ProjectDetails> details) {
+        Map<Long, String> imageByUnit = primaryImagesByUnit(details);
+
         List<ProjectDTO.ProjectDetailDTO> detailDTOs = new ArrayList<>();
         for (ProjectDetails d : details) {
             CustomCalculationValues in = d.getCustomCalculationValues();
             CalculationOutputValues out = d.getCalculationOutputValues();
+            Unit u = d.getUnit();
             detailDTOs.add(new ProjectDTO.ProjectDetailDTO(
                     d.getId(),
-                    d.getUnit() != null ? d.getUnit().getId() : null,
-                    d.getUnit() != null ? d.getUnit().getModel() : null,
+                    u != null ? u.getId() : null,
+                    u != null ? u.getName() : null,
+                    u != null ? u.getModel() : null,
+                    u != null ? imageByUnit.get(u.getId()) : null,
                     in != null ? in.getAmbient() : 0,
                     in != null ? in.getEvapIn() : 0,
                     in != null ? in.getEvapOut() : 0,
@@ -178,7 +265,31 @@ public class ProjectAppService {
         }
         return new ProjectDTO(
                 p.getId(), p.getName(), p.getCompany(), p.getAddress(),
-                p.getCountry(), p.getCity(), p.getPhone(), detailDTOs);
+                p.getCountry(), p.getCity(), p.getPhone(),
+                fmtDate(p.getCreatedAt()), fmtDate(p.getUpdatedAt()),
+                detailDTOs);
+    }
+
+    private String fmtDate(LocalDateTime dt) {
+        return dt == null ? null : dt.format(PROJECT_DATE_FMT);
+    }
+
+    // Maps each detail's unit to its primary image URL (the same image the catalog/saved
+    // cards show), resolved in one batched query. unit.getId() on a lazy proxy is free,
+    // so this never forces the unit graph to load.
+    private Map<Long, String> primaryImagesByUnit(List<ProjectDetails> details) {
+        List<Long> unitIds = details.stream()
+                .map(d -> d.getUnit() != null ? d.getUnit().getId() : null)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        if (unitIds.isEmpty()) return Map.of();
+
+        Map<Long, String> byUnit = new HashMap<>();
+        for (Object[] row : unitRepository.findPrimaryImageUrls(unitIds)) {
+            byUnit.put((Long) row[0], (String) row[1]);
+        }
+        return byUnit;
     }
 
     private Project requireOwnedProject(Long projectId) {

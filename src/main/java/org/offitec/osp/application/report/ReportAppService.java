@@ -1,5 +1,6 @@
 package org.offitec.osp.application.report;
 
+import org.offitec.osp.domain.entity.Project;
 import org.offitec.osp.domain.entity.Unit;
 import org.offitec.osp.domain.entity.User;
 import org.offitec.osp.domain.enums.Mod;
@@ -60,9 +61,10 @@ public class ReportAppService {
      * Renders the report for an already-loaded unit and stores it in R2, returning the
      * public URL. Used by the add-to-project flow (the only place a report is persisted);
      * runs in the caller's transaction so the URL can be saved on the ProjectDetails row.
+     * The project (when present) supplies the contact/address block printed on the report.
      */
-    public String renderAndStore(Unit unit, Mod mod, double ambient, double evapIn, double evapOut, User user) {
-        UnitReportModel model = assembler.assemble(unit, mod, ambient, evapIn, evapOut, null, user);
+    public String renderAndStore(Unit unit, Mod mod, double ambient, double evapIn, double evapOut, Project project, User user) {
+        UnitReportModel model = assembler.assemble(unit, mod, ambient, evapIn, evapOut, project, user);
         byte[] pdf = pdfReportService.render(model);
 
         String key = "unit-" + unit.getId() + "/" + java.util.UUID.randomUUID() + ".pdf";

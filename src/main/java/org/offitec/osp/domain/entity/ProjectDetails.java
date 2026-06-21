@@ -2,6 +2,7 @@ package org.offitec.osp.domain.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.offitec.osp.domain.enums.Mod;
 
 @Entity
 @Table(name = "project_details")
@@ -34,6 +35,12 @@ public class ProjectDetails {
     @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "calc_output_vals_id")
     private CalculationOutputValues calculationOutputValues;
+
+    // The operating mode this calculation was run in (COOLING/HEATING). Stored so the
+    // report can be regenerated with the exact same inputs when project info changes.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mod")
+    private Mod mod;
 
     private String pdfUrl;
 }

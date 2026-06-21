@@ -71,4 +71,15 @@ public interface UnitJpaRepository extends JpaRepository<Unit, Long>, UnitReposi
     List<UnitCardDTO> findSavedCards(@Param("userId") Long userId,
                                     @Param("category") UnitCategory category,
                                     @Param("unitType") UnitTypeEnum unitType);
+
+    // Primary image URL per unit (the same image the catalog/saved cards show), fetched
+    // for a set of units in one query. Each row is [unitId, url]. Used to put the unit's
+    // image on project-detail cards without lazily loading each unit's asset collection.
+    @Query("""
+            SELECT a.unit.id, a.url FROM UnitAsset a
+            WHERE a.unit.id IN :unitIds
+              AND a.assetType = org.offitec.osp.domain.enums.AssetType.IMAGE
+              AND a.isPrimary = true
+            """)
+    List<Object[]> findPrimaryImageUrls(@Param("unitIds") List<Long> unitIds);
 }

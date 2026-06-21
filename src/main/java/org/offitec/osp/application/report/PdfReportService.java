@@ -1,5 +1,6 @@
 package org.offitec.osp.application.report;
 
+import com.openhtmltopdf.outputdevice.helper.BaseRendererBuilder;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import com.openhtmltopdf.svgsupport.BatikSVGDrawer;
 import org.offitec.osp.application.report.chart.PressureDropSvgBuilder;
@@ -11,6 +12,7 @@ import org.thymeleaf.context.Context;
 import org.thymeleaf.templatemode.TemplateMode;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -34,6 +36,11 @@ public class PdfReportService {
     private final String ospLogoDataUri;
     private final String offitecLogoDataUri;
 
+    // A Unicode TrueType font (full Latin coverage) embedded so locale-specific characters
+    // in user-entered fields — e.g. Turkish "İzmir" — render instead of showing "#".
+    // The built-in PDF Helvetica only covers Latin-1, which is why those glyphs were missing.
+    private final byte[] unicodeFont;
+
     public PdfReportService(WorkingLimitSvgBuilder workingLimitSvg,
                             PressureDropSvgBuilder pressureDropSvg) {
         this.workingLimitSvg = workingLimitSvg;
@@ -41,6 +48,7 @@ public class PdfReportService {
         this.templateEngine = buildTemplateEngine();
         this.ospLogoDataUri = loadAsDataUri("report/logo/osp-logo.png");
         this.offitecLogoDataUri = loadAsDataUri("report/logo/offitec-logo.png");
+        this.unicodeFont = loadBytes("report/fonts/Geist-Regular.ttf");
     }
 
     public byte[] render(UnitReportModel model) {
@@ -57,6 +65,12 @@ public class PdfReportService {
             PdfRendererBuilder builder = new PdfRendererBuilder();
             builder.useFastMode();
             builder.useSVGDrawer(new BatikSVGDrawer());
+            // Register the Unicode font under the "Geist" family (normal + bold both map to
+            // the same file) so CSS font-family: 'Geist' resolves to a glyph-complete font.
+            if (unicodeFont != null && unicodeFont.length > 0) {
+                builder.useFont(() -> new ByteArrayInputStream(unicodeFont), "Geist", 400, BaseRendererBuilder.FontStyle.NORMAL, true);
+                builder.useFont(() -> new ByteArrayInputStream(unicodeFont), "Geist", 700, BaseRendererBuilder.FontStyle.NORMAL, true);
+            }
             builder.withHtmlContent(html, null);
             builder.toStream(os);
             builder.run();
@@ -86,6 +100,15 @@ public class PdfReportService {
         } catch (Exception e) {
             // Missing logo shouldn't break the whole report.
             return "";
+        }
+    }
+
+    private byte[] loadBytes(String classpath) {
+        try (InputStream in = new ClassPathResource(classpath).getInputStream()) {
+            return in.readAllBytes();
+        } catch (Exception e) {
+            // Missing font shouldn't break the whole report; it falls back to Helvetica.
+            return null;
         }
     }
 

@@ -94,7 +94,7 @@ public class ReportDataAssembler {
                 .projectName(project != null ? project.getName() : "")
                 .responsiblePerson(user != null ? nz(user.getUsername()) : "")
                 .email(user != null ? nz(user.getEmail()) : "")
-                .phone(pick(project != null ? project.getPhone() : null, user != null ? user.getPhone() : null))
+                .phone(formatPhone(pick(project != null ? project.getPhone() : null, user != null ? user.getPhone() : null)))
                 .country(pick(project != null ? project.getCountry() : null, user != null ? user.getCountry() : null))
                 .city(pick(project != null ? project.getCity() : null, user != null ? user.getCity() : null))
                 .address(pick(project != null ? project.getAddress() : null, user != null ? user.getAddress() : null))
@@ -209,6 +209,14 @@ public class ReportDataAssembler {
     private String fmt1(double v) { return String.format(Locale.US, "%.1f", v); }
     private String fmt2(double v) { return String.format(Locale.US, "%.2f", v); }
     private String fmtThousands(double v) { return String.format(Locale.US, "%,.0f", v); }
+
+    // The phone is stored as the country code + number without a leading "+"
+    // (react-phone-input-2's format). Prefix "+" so the dialing code is shown on the report.
+    private String formatPhone(String raw) {
+        if (raw == null || raw.isBlank()) return "";
+        String trimmed = raw.trim();
+        return trimmed.startsWith("+") ? trimmed : "+" + trimmed;
+    }
 
     private String nz(String s) { return s == null ? "" : s; }
     private String pick(String a, String b) {

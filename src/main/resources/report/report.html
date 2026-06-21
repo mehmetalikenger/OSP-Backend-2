@@ -49,6 +49,9 @@
         table.kv { width: 100%; border-collapse: collapse; border: 1px solid #ccc; margin-bottom: 4px; }
         table.kv td { padding: 5px 8px; border-bottom: 1px solid #e2e2e2; }
         table.kv .k { width: 28%; color: #444; }
+        /* User-entered values can contain locale-specific characters (e.g. Turkish "İzmir"),
+           so render them with the embedded glyph-complete font. */
+        table.kv .v { font-family: 'Geist', Helvetica, Arial, sans-serif; }
         .block-title {
             background: #8a8a8a; color: #fff; font-weight: bold; font-size: 10px;
             padding: 5px 8px; margin-top: 16px;
@@ -89,14 +92,14 @@
 <!-- ===== Project Information ===== -->
 <div class="block-title">Project Information</div>
 <table class="kv">
-    <tr><td class="k">Project Name</td><td th:text="${m.projectName}"></td></tr>
-    <tr><td class="k">Name</td><td th:text="${m.responsiblePerson}"></td></tr>
-    <tr><td class="k">Email Address</td><td th:text="${m.email}"></td></tr>
-    <tr><td class="k">Phone Number</td><td th:text="${m.phone}"></td></tr>
-    <tr><td class="k">Country</td><td th:text="${m.country}"></td></tr>
-    <tr><td class="k">City</td><td th:text="${m.city}"></td></tr>
-    <tr><td class="k">Address</td><td th:text="${m.address}"></td></tr>
-    <tr><td class="k">Date</td><td th:text="${m.printedDate}"></td></tr>
+    <tr><td class="k">Project Name</td><td class="v" th:text="${m.projectName}"></td></tr>
+    <tr><td class="k">Name</td><td class="v" th:text="${m.responsiblePerson}"></td></tr>
+    <tr><td class="k">Email Address</td><td class="v" th:text="${m.email}"></td></tr>
+    <tr><td class="k">Phone Number</td><td class="v" th:text="${m.phone}"></td></tr>
+    <tr><td class="k">Country</td><td class="v" th:text="${m.country}"></td></tr>
+    <tr><td class="k">City</td><td class="v" th:text="${m.city}"></td></tr>
+    <tr><td class="k">Address</td><td class="v" th:text="${m.address}"></td></tr>
+    <tr><td class="k">Date</td><td class="v" th:text="${m.printedDate}"></td></tr>
 </table>
 
 <!-- ===== Configuration ===== -->

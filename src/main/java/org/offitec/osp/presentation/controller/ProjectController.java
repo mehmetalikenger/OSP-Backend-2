@@ -5,6 +5,7 @@ import org.offitec.osp.application.service.ProjectAppService;
 import org.offitec.osp.presentation.dto.AddToProjectDTO;
 import org.offitec.osp.presentation.dto.CreateProjectDTO;
 import org.offitec.osp.presentation.dto.ProjectDTO;
+import org.offitec.osp.presentation.dto.UpdateProjectDTO;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -33,6 +34,18 @@ public class ProjectController {
     @PostMapping
     public ResponseEntity<ProjectDTO> create(@Valid @RequestBody CreateProjectDTO dto) {
         return ResponseEntity.ok(service.create(dto));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ProjectDTO> update(@PathVariable Long id,
+                                             @RequestBody UpdateProjectDTO dto) {
+        return ResponseEntity.ok(service.update(id, dto));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        service.delete(id);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/details")
