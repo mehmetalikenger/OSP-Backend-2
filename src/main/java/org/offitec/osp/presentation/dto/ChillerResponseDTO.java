@@ -52,4 +52,12 @@ public class ChillerResponseDTO {
     private String liquidLineDiameter;
     private String suctionLineDiameter;
     private double gasTank;
+
+    // Working envelope (safe-area bounds for the report's Working Limit graph).
+    private double minWaterInlet;
+    private double maxWaterInlet;
+    private double minWaterOutlet;
+    private double maxWaterOutlet;
+    private double minAmbient;
+    private double maxAmbient;
 }

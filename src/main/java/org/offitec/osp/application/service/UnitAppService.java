@@ -362,6 +362,12 @@ public class UnitAppService {
         r.setLiquidLineDiameter(unit.getLiquidLineDiameter());
         r.setSuctionLineDiameter(unit.getSuctionLineDiameter());
         r.setGasTank(unit.getGasTank());
+        r.setMinWaterInlet(unit.getMinWaterInlet());
+        r.setMaxWaterInlet(unit.getMaxWaterInlet());
+        r.setMinWaterOutlet(unit.getMinWaterOutlet());
+        r.setMaxWaterOutlet(unit.getMaxWaterOutlet());
+        r.setMinAmbient(unit.getMinAmbient());
+        r.setMaxAmbient(unit.getMaxAmbient());
 
         // per-mode (tech specs)
         r.setCapacity(ts.getCapacity());
@@ -645,6 +651,12 @@ public class UnitAppService {
         unit.setLiquidLineDiameter(d.getLiquidLineDiameter());
         unit.setSuctionLineDiameter(d.getSuctionLineDiameter());
         unit.setGasTank(d.getGasTank());
+        unit.setMinWaterInlet(d.getMinWaterInlet());
+        unit.setMaxWaterInlet(d.getMaxWaterInlet());
+        unit.setMinWaterOutlet(d.getMinWaterOutlet());
+        unit.setMaxWaterOutlet(d.getMaxWaterOutlet());
+        unit.setMinAmbient(d.getMinAmbient());
+        unit.setMaxAmbient(d.getMaxAmbient());
     }
 
     // Per-mode attributes + the component spec points selected for that mode.
@@ -692,6 +704,12 @@ public class UnitAppService {
         unit.setLiquidLineDiameter(d.getLiquidLineDiameter());
         unit.setSuctionLineDiameter(d.getSuctionLineDiameter());
         unit.setGasTank(d.getGasTank());
+        unit.setMinWaterInlet(d.getMinWaterInlet());
+        unit.setMaxWaterInlet(d.getMaxWaterInlet());
+        unit.setMinWaterOutlet(d.getMinWaterOutlet());
+        unit.setMaxWaterOutlet(d.getMaxWaterOutlet());
+        unit.setMinAmbient(d.getMinAmbient());
+        unit.setMaxAmbient(d.getMaxAmbient());
     }
 
     void applyModeSpecs(TechSpecs ts, UnitModeSpecsDTO d) {

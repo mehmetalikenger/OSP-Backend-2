@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <style>
+        @page {
+            size: A4;
+            margin: 96px 38px 58px 38px;
+            @top-center { content: element(pageHeader); }
+            @bottom-left {
+                content: "OSP Unit Selection Report";
+                font-family: Helvetica, Arial, sans-serif; font-size: 8px; color: #888;
+            }
+            @bottom-right {
+                content: "Page " counter(page) " / " counter(pages);
+                font-family: Helvetica, Arial, sans-serif; font-size: 8px; color: #888;
+            }
+        }
+
+        body { font-family: Helvetica, Arial, sans-serif; font-size: 10px; color: #1b1b1b; }
+
+        /* Logo header repeated on every page */
+        #pageHeader { position: running(pageHeader); width: 100%; }
+        #pageHeader table { width: 100%; border-collapse: collapse; }
+        #pageHeader td { vertical-align: middle; }
+        #pageHeader .osp { text-align: left; }
+        #pageHeader .offitec { text-align: right; }
+        #pageHeader img.osp-logo { height: 34px; }
+        #pageHeader img.offitec-logo { height: 30px; }
+        #pageHeader .rule { border-bottom: 1px solid #d0d0d0; height: 4px; }
+
+        h1.report-title {
+            font-size: 13px; letter-spacing: 1px; color: #333; margin: 0 0 12px 0;
+            text-transform: uppercase;
+        }
+        .section-title {
+            font-size: 11px; font-weight: bold; color: #1f4e9b;
+            margin: 16px 0 5px 0;
+        }
+
+        table.data { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+        table.data td { padding: 4px 8px; }
+        table.data tr:nth-child(odd) td { background: #eef3fb; }
+        table.data .label { width: 56%; }
+        table.data .unit { width: 14%; color: #555; }
+        table.data .value { width: 30%; text-align: right; font-weight: bold; }
+
+        /* Project info: two columns, label + value */
+        table.kv { width: 100%; border-collapse: collapse; border: 1px solid #ccc; margin-bottom: 4px; }
+        table.kv td { padding: 5px 8px; border-bottom: 1px solid #e2e2e2; }
+        table.kv .k { width: 28%; color: #444; }
+        .block-title {
+            background: #8a8a8a; color: #fff; font-weight: bold; font-size: 10px;
+            padding: 5px 8px; margin-top: 16px;
+        }
+
+        .config-line { margin: 2px 0; }
+        .config-line .k { font-weight: bold; display: inline-block; width: 90px; }
+
+        /* Full load cooling table */
+        table.fl { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+        table.fl td, table.fl th {
+            padding: 5px 6px; text-align: center; border: 1px solid #e2e2e2; font-weight: normal;
+        }
+        table.fl th { background: #f0f0f0; text-align: left; width: 30%; }
+        table.fl tr.values td { background: #e8f5e9; }
+        table.fl td.rowhead { background: #f0f0f0; text-align: left; font-weight: bold; }
+
+        .chart { text-align: center; margin: 6px 0 4px 0; page-break-inside: avoid; }
+        .note { font-size: 8.5px; color: #666; margin: 2px 0; }
+        .avoid-break { page-break-inside: avoid; }
+    </style>
+</head>
+<body>
+
+<!-- ===== Repeating logo header (OSP top-left, Offitec top-right) ===== -->
+<div id="pageHeader">
+    <table>
+        <tr>
+            <td class="osp"><img class="osp-logo" th:src="${ospLogo}" alt="OSP"/></td>
+            <td class="offitec"><img class="offitec-logo" th:src="${offitecLogo}" alt="Offitec"/></td>
+        </tr>
+        <tr><td colspan="2" class="rule"></td></tr>
+    </table>
+</div>
+
+<h1 class="report-title" th:text="${m.category} + ' Selection'">Unit Selection</h1>
+
+<!-- ===== Project Information ===== -->
+<div class="block-title">Project Information</div>
+<table class="kv">
+    <tr><td class="k">Project Name</td><td th:text="${m.projectName}"></td></tr>
+    <tr><td class="k">Name</td><td th:text="${m.responsiblePerson}"></td></tr>
+    <tr><td class="k">Email Address</td><td th:text="${m.email}"></td></tr>
+    <tr><td class="k">Phone Number</td><td th:text="${m.phone}"></td></tr>
+    <tr><td class="k">Country</td><td th:text="${m.country}"></td></tr>
+    <tr><td class="k">City</td><td th:text="${m.city}"></td></tr>
+    <tr><td class="k">Address</td><td th:text="${m.address}"></td></tr>
+    <tr><td class="k">Date</td><td th:text="${m.printedDate}"></td></tr>
+</table>
+
+<!-- ===== Configuration ===== -->
+<div class="section-title">Configuration</div>
+<div class="config-line"><span class="k">Model</span><span th:text="${m.model}"></span></div>
+<div class="config-line"><span class="k">Category</span><span th:text="${m.category}"></span></div>
+
+<!-- ===== Inputs (Design) ===== -->
+<div class="section-title">Inputs</div>
+<table class="data">
+    <tr><td class="label">Ambient Temperature</td><td class="unit">°C</td><td class="value" th:text="${m.ambient}"></td></tr>
+    <tr><td class="label">Water Inlet Temperature</td><td class="unit">°C</td><td class="value" th:text="${m.waterInlet}"></td></tr>
+    <tr><td class="label">Water Outlet Temperature</td><td class="unit">°C</td><td class="value" th:text="${m.waterOutlet}"></td></tr>
+</table>
+
+<!-- ===== Working Limit Graph ===== -->
+<div class="section-title">Working Limit Graph</div>
+<div class="chart" th:utext="${workingLimitSvg}"></div>
+
+<!-- ===== Unit Specifications ===== -->
+<div class="section-title">Unit Specifications</div>
+<table class="data">
+    <tr><td class="label">Cooling Capacity</td><td class="unit">kcal/h</td><td class="value" th:text="${m.coolingCapacityKcalh}"></td></tr>
+    <tr><td class="label">Cooling Capacity</td><td class="unit">kW</td><td class="value" th:text="${m.coolingCapacityKw}"></td></tr>
+    <tr><td class="label">Input Power</td><td class="unit">kW</td><td class="value" th:text="${m.inputPowerKw}"></td></tr>
+    <tr><td class="label" th:text="${m.eerCopLabel}"></td><td class="unit">W/W</td><td class="value" th:text="${m.eerCopValue}"></td></tr>
+</table>
+
+<!-- ===== Full Load Cooling ===== -->
+<div class="section-title">Full Load Cooling</div>
+<table class="fl avoid-break">
+    <tr>
+        <th>Dry bulb ambient air temperature [°C]</th>
+        <td th:each="r : ${m.fullLoad}" th:text="${r.ambient}"></td>
+    </tr>
+    <tr class="values">
+        <td class="rowhead">Capacity [kW]</td>
+        <td th:each="r : ${m.fullLoad}" th:text="${r.capacity}"></td>
+    </tr>
+    <tr class="values">
+        <td class="rowhead">Input Power [kW]</td>
+        <td th:each="r : ${m.fullLoad}" th:text="${r.power}"></td>
+    </tr>
+    <tr class="values">
+        <td class="rowhead" th:text="${m.eerCopLabel} + ' [W/W]'"></td>
+        <td th:each="r : ${m.fullLoad}" th:text="${r.eerCop}"></td>
+    </tr>
+</table>
+<div class="note">The data in the table are calculated according to the entered Water Inlet/Outlet values.</div>
+
+<!-- ===== Technical Specifications ===== -->
+<div class="section-title">Unit Technical Specifications</div>
+<table class="data">
+    <tr><td class="label">Refrigerant</td><td class="unit">-</td><td class="value" th:text="${m.refrigerantCode}"></td></tr>
+    <tr><td class="label">Compressor Model</td><td class="unit">-</td><td class="value" th:text="${m.compressorModel}"></td></tr>
+    <tr><td class="label">Compressor Brand</td><td class="unit">-</td><td class="value" th:text="${m.compressorBrand}"></td></tr>
+    <tr><td class="label">Compressor Quantity</td><td class="unit">n</td><td class="value" th:text="${m.compressorQty}"></td></tr>
+    <tr><td class="label">Circuit Quantity</td><td class="unit">n</td><td class="value" th:text="${m.circuitQty}"></td></tr>
+    <tr><td class="label">Condenser Type</td><td class="unit">Type</td><td class="value" th:text="${m.condenserType}"></td></tr>
+</table>
+
+<!-- ===== Hydraulic Kit ===== -->
+<div class="section-title">Hydraulic Kit</div>
+<table class="data">
+    <tr><td class="label">Evaporator Type</td><td class="unit">Type</td><td class="value" th:text="${m.evaporatorType}"></td></tr>
+    <tr><td class="label">Flow Rate</td><td class="unit">m³/h</td><td class="value" th:text="${m.flowRate}"></td></tr>
+    <tr><td class="label">Water Pressure (System Need)</td><td class="unit">bar</td><td class="value" th:text="${m.waterPressure}"></td></tr>
+    <tr><td class="label">Pressure Drop</td><td class="unit">kPa</td><td class="value" th:text="${m.pressureDrop}"></td></tr>
+</table>
+
+<!-- ===== Pressure Drop / Flow Rate Graph ===== -->
+<div class="section-title">Pressure Drop / Flow Rate Graph</div>
+<div class="chart" th:utext="${pressureDropSvg}"></div>
+
+<!-- ===== Fans ===== -->
+<div class="section-title">Fans</div>
+<table class="data">
+    <tr><td class="label">Type</td><td class="unit">-</td><td class="value" th:text="${m.fanType}"></td></tr>
+    <tr><td class="label">Number of Fans</td><td class="unit">n</td><td class="value" th:text="${m.fanQty}"></td></tr>
+    <tr><td class="label">Air Flow Rate</td><td class="unit">m³/h</td><td class="value" th:text="${m.airFlowRate}"></td></tr>
+</table>
+
+<!-- ===== Pipe Connection ===== -->
+<div class="section-title">Pipe Connection</div>
+<table class="data">
+    <tr><td class="label">Water Inlet Connection</td><td class="unit">inch</td><td class="value" th:text="${m.waterInletConnection}"></td></tr>
+    <tr><td class="label">Water Outlet Connection</td><td class="unit">inch</td><td class="value" th:text="${m.waterOutletConnection}"></td></tr>
+</table>
+
+<!-- ===== Electrical Data ===== -->
+<div class="section-title">Electrical Data</div>
+<table class="data">
+    <tr><td class="label">MRA</td><td class="unit">A</td><td class="value" th:text="${m.mra}"></td></tr>
+    <tr><td class="label">LRA</td><td class="unit">A</td><td class="value" th:text="${m.lra}"></td></tr>
+</table>
+
+<!-- ===== Unit Dimensions ===== -->
+<div class="section-title">Unit Dimensions</div>
+<table class="data">
+    <tr><td class="label">Length</td><td class="unit">m</td><td class="value" th:text="${m.length}"></td></tr>
+    <tr><td class="label">Width</td><td class="unit">m</td><td class="value" th:text="${m.width}"></td></tr>
+    <tr><td class="label">Height</td><td class="unit">m</td><td class="value" th:text="${m.height}"></td></tr>
+</table>
+
+</body>
+</html>

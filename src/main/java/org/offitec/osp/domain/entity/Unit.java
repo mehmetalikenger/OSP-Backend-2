@@ -91,6 +91,26 @@ public class Unit {
     @Column(name = "gas_tank")
     private double gasTank;
 
+    // --- Working envelope (used to draw the safe area of the Working Limit graph in the report) ---
+
+    @Column(name = "min_water_inlet")
+    private double minWaterInlet;
+
+    @Column(name = "max_water_inlet")
+    private double maxWaterInlet;
+
+    @Column(name = "min_water_outlet")
+    private double minWaterOutlet;
+
+    @Column(name = "max_water_outlet")
+    private double maxWaterOutlet;
+
+    @Column(name = "min_ambient")
+    private double minAmbient;
+
+    @Column(name = "max_ambient")
+    private double maxAmbient;
+
     @OneToMany(mappedBy = "unit", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<UnitDetails> unitDetails;
 

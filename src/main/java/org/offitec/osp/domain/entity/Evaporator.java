@@ -2,6 +2,7 @@ package org.offitec.osp.domain.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.offitec.osp.domain.enums.EvaporatorType;
 
 @Entity
 @Table(name = "evaporator")
@@ -21,6 +22,10 @@ public class Evaporator {
 
     @Column(nullable = false)
     private String model;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type")
+    private EvaporatorType type;
 
     @Column(nullable = false)
     @org.hibernate.annotations.ColumnDefault("false")

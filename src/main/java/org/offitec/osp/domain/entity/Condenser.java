@@ -2,6 +2,7 @@ package org.offitec.osp.domain.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.offitec.osp.domain.enums.CondenserType;
 
 @Entity
 @Table(name = "condenser")
@@ -21,6 +22,10 @@ public class Condenser {
 
     @Column(nullable = false)
     private String model;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type")
+    private CondenserType type;
 
     @Column(nullable = false)
     @org.hibernate.annotations.ColumnDefault("false")

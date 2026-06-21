@@ -2,9 +2,11 @@ package org.offitec.osp.presentation.dto;
 
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
+import lombok.Setter;
 
 // Technical attributes shared across all modes of a unit (stored on the Unit).
 @Getter
+@Setter
 public class UnitCommonSpecsDTO {
 
     public int compressorQty;
@@ -28,4 +30,12 @@ public class UnitCommonSpecsDTO {
     public String liquidLineDiameter;
     public String suctionLineDiameter;
     public double gasTank;
+
+    // Working envelope for the report's Working Limit graph (safe-area bounds).
+    public double minWaterInlet;
+    public double maxWaterInlet;
+    public double minWaterOutlet;
+    public double maxWaterOutlet;
+    public double minAmbient;
+    public double maxAmbient;
 }

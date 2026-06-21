@@ -20,7 +20,10 @@ public class ProjectDetails {
     @JoinColumn(name = "project_id", nullable = false)
     private Project project;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    // ManyToOne (not OneToOne): the same unit can appear in many projects, and a
+    // project can hold many units. A OneToOne here forces a UNIQUE constraint on
+    // product_id, which breaks adding the same unit to more than one project.
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
     private Unit unit;
 

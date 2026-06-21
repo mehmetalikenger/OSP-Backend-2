@@ -24,6 +24,7 @@ public class S3Service {
     private static final String PREFIX_ICONS     = "icons";
     private static final String PREFIX_DOCUMENTS = "documents";
     private static final String PREFIX_USERS     = "user-pictures";
+    private static final String PREFIX_REPORTS   = "reports";
 
     @Value("${spring.storage.r2.bucket-name}")
     private String bucket;
@@ -57,11 +58,18 @@ public class S3Service {
         return upload(PREFIX_USERS + "/" + key, file);
     }
 
+    // Generated reports are rendered in-process as raw bytes (no MultipartFile),
+    // so they take the byte-array upload path rather than the MultipartFile one.
+    public String uploadReport(String key, byte[] pdf) {
+        return uploadBytes(PREFIX_REPORTS + "/" + key, pdf, "application/pdf");
+    }
+
     public void deleteImage(String url)          { delete(url); }
     public void deleteTechnicalImage(String url) { delete(url); }
     public void deleteIcon(String url)           { delete(url); }
     public void deleteDocument(String url)       { delete(url); }
     public void deleteUserPicture(String url)    { delete(url); }
+    public void deleteReport(String url)         { delete(url); }
 
     public String presignImage(String url)          { return presign(url); }
     public String presignTechnicalImage(String url) { return presign(url); }
@@ -153,6 +161,20 @@ public class S3Service {
             storage.putObject(new PutObjectRequest(bucket, key, file.getInputStream(), metadata));
             return publicBaseUrl + "/" + key;
         } catch (IOException e) {
+            throw new RuntimeException("Failed to upload file: " + key, e);
+        }
+    }
+
+    // Stores raw in-memory bytes (e.g. a generated PDF) under the given full key.
+    private String uploadBytes(String key, byte[] bytes, String contentType) {
+        try {
+            ObjectMetadata metadata = new ObjectMetadata();
+            metadata.setContentType(contentType);
+            metadata.setContentLength(bytes.length);
+
+            storage.putObject(new PutObjectRequest(bucket, key, new ByteArrayInputStream(bytes), metadata));
+            return publicBaseUrl + "/" + key;
+        } catch (Exception e) {
             throw new RuntimeException("Failed to upload file: " + key, e);
         }
     }

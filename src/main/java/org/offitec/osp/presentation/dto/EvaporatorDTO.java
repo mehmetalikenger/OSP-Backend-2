@@ -9,6 +9,8 @@ public class EvaporatorDTO {
 
     private String brand;
 
+    private String type; // EvaporatorType enum name: PLATE / COIL / SHELL_AND_TUBE (optional)
+
     public String getModel() {
         return model;
     }
@@ -23,5 +25,13 @@ public class EvaporatorDTO {
 
     public void setBrand(String brand) {
         this.brand = brand;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
     }
 }

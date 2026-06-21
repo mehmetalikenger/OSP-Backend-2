@@ -2,6 +2,8 @@ package org.offitec.osp.application.service;
 
 import org.offitec.osp.domain.entity.*;
 import org.offitec.osp.domain.enums.CompressorKind;
+import org.offitec.osp.domain.enums.CondenserType;
+import org.offitec.osp.domain.enums.EvaporatorType;
 import org.offitec.osp.domain.exception.*;
 import org.offitec.osp.domain.service.ComponentDomainService;
 import org.offitec.osp.domain.service.AuditLogService;
@@ -170,6 +172,7 @@ public class ComponentAppService {
         Evaporator evaporator = new Evaporator();
         evaporator.setBrand(dto.getBrand());
         evaporator.setModel(dto.getModel());
+        evaporator.setType(parseEvaporatorType(dto.getType()));
 
         evaporatorRepository.save(evaporator);
     }
@@ -208,6 +211,7 @@ public class ComponentAppService {
         Evaporator evaporator = dbEvaporator.get();
         evaporator.setBrand(dto.getBrand());
         evaporator.setModel(dto.getModel());
+        evaporator.setType(parseEvaporatorType(dto.getType()));
 
         evaporatorRepository.save(evaporator);
     }
@@ -247,6 +251,7 @@ public class ComponentAppService {
         Condenser condenser = new Condenser();
         condenser.setBrand(dto.getBrand());
         condenser.setModel(dto.getModel());
+        condenser.setType(parseCondenserType(dto.getType()));
         condenserRepository.save(condenser);
     }
 
@@ -276,6 +281,7 @@ public class ComponentAppService {
         Condenser condenser = dbCondenser.get();
         condenser.setBrand(dto.getBrand());
         condenser.setModel(dto.getModel());
+        condenser.setType(parseCondenserType(dto.getType()));
         condenserRepository.save(condenser);
     }
 
@@ -490,6 +496,17 @@ public class ComponentAppService {
     private Long resolveAdminId(String adminEmail) {
         if (adminEmail == null) return -1L;
         return userRepositoryPort.findByEmail(adminEmail).map(User::getId).orElse(-1L);
+    }
+
+    // Null/blank-safe enum parsing for the optional component "type" fields.
+    private static CondenserType parseCondenserType(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        return CondenserType.valueOf(raw.trim().toUpperCase());
+    }
+
+    private static EvaporatorType parseEvaporatorType(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        return EvaporatorType.valueOf(raw.trim().toUpperCase());
     }
 
     @Transactional

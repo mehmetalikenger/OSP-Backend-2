@@ -100,6 +100,36 @@
             <artifactId>thumbnailator</artifactId>
             <version>0.4.20</version>
         </dependency>
+
+        <!-- Thymeleaf: HTML templating for the generated PDF report -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+        <!-- OGNL: required by the standalone (non-Spring) Thymeleaf engine used for PDF rendering.
+             The Spring starter omits it because Spring's integration evaluates with SpEL instead. -->
+        <dependency>
+            <groupId>ognl</groupId>
+            <artifactId>ognl</artifactId>
+            <version>3.3.4</version>
+        </dependency>
+
+        <!-- openhtmltopdf: render the report HTML (+ inline SVG charts) to a PDF entirely on the backend -->
+        <dependency>
+            <groupId>com.openhtmltopdf</groupId>
+            <artifactId>openhtmltopdf-core</artifactId>
+            <version>1.0.10</version>
+        </dependency>
+        <dependency>
+            <groupId>com.openhtmltopdf</groupId>
+            <artifactId>openhtmltopdf-pdfbox</artifactId>
+            <version>1.0.10</version>
+        </dependency>
+        <dependency>
+            <groupId>com.openhtmltopdf</groupId>
+            <artifactId>openhtmltopdf-svg-support</artifactId>
+            <version>1.0.10</version>
+        </dependency>
     </dependencies>
 
     <build>

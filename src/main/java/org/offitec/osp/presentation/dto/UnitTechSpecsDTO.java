@@ -48,4 +48,12 @@ public class UnitTechSpecsDTO {
     public String liquidLineDiameter;
     public String suctionLineDiameter;
     public double gasTank;
+
+    // Working envelope for the report's Working Limit graph (safe-area bounds).
+    public double minWaterInlet;
+    public double maxWaterInlet;
+    public double minWaterOutlet;
+    public double maxWaterOutlet;
+    public double minAmbient;
+    public double maxAmbient;
 }
