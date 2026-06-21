@@ -65,8 +65,17 @@ public class ReportDataAssembler {
 
         UnitCalculationEngine.Result design = engine.compute(cspecs, unit.getCompressorQty(), ambient, evapOut);
 
-        double capacityKw = design.capacityKw();
-        double flowRate = capacityKw * 860.0 / 5000.0;
+        // The "Unit Specifications" block uses the unit's STORED technical specs (a property
+        // of the unit), not values computed from this calculation. Capacity and EER/COP are
+        // stored directly; input power is derived (power = capacity / COP). Fall back to the
+        // computed result only when a stored spec is missing (0).
+        double specCapacityKw = ts.getCapacity() > 0 ? ts.getCapacity() : design.capacityKw();
+        double specCop = ts.getCopErr() > 0 ? ts.getCopErr() : design.copEer();
+        double specPowerKw = specCop > 0 ? specCapacityKw / specCop : design.powerKw();
+
+        // Flow rate is derived from the rated cooling capacity (the value shown in Unit
+        // Specifications): capacity(kW) * 860 / 5000, so the two stay consistent.
+        double flowRate = specCapacityKw * 860.0 / 5000.0;
         boolean cooling = mod == Mod.COOLING;
 
         // --- Full load cooling table across the standard ambient range ---
@@ -106,12 +115,12 @@ public class ReportDataAssembler {
                 .ambient(fmt1(ambient))
                 .waterInlet(fmt1(evapIn))
                 .waterOutlet(fmt1(evapOut))
-                // Unit specifications
-                .coolingCapacityKcalh(fmtThousands(capacityKw * 860.0))
-                .coolingCapacityKw(fmt1(capacityKw))
-                .inputPowerKw(fmt1(design.powerKw()))
+                // Unit specifications (from the unit's stored technical specs)
+                .coolingCapacityKcalh(fmtThousands(specCapacityKw * 860.0))
+                .coolingCapacityKw(fmt1(specCapacityKw))
+                .inputPowerKw(fmt1(specPowerKw))
                 .eerCopLabel(cooling ? "EER" : "COP")
-                .eerCopValue(fmt2(design.copEer()))
+                .eerCopValue(fmt2(specCop))
                 .fullLoad(fullLoad)
                 // Technical specifications
                 .refrigerantCode(unit.getRefrigerant() != null ? nz(unit.getRefrigerant().getCode()) : "-")
