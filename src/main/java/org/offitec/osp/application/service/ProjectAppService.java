@@ -120,24 +120,35 @@ public class ProjectAppService {
         UnitCalculationEngine.Result r =
                 engine.compute(ts.getCompressorSpecs(), unit.getCompressorQty(), dto.getAmbient(), dto.getEvapOut());
 
+        // Apply the glycol mixture correction (if any) to the persisted outputs.
+        GlycolCorrection.Factors gf = GlycolCorrection.lookup(dto.getGlycolType(), dto.getGlycolPercentage());
+        double capKw = r.capacityKw() * gf.capacity();
+        double powKw = r.powerKw() * gf.power();
+        double cop = powKw > 0 ? capKw / powKw : r.copEer();
+
+        double pressureDrop = 50.0 * gf.pressureDrop();
+
         CustomCalculationValues inputs = new CustomCalculationValues(
-                null, dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(), dto.getCondIn(), dto.getCondOut());
+                null, dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(), dto.getCondIn(), dto.getCondOut(),
+                dto.getGlycolType(), dto.getGlycolPercentage());
 
         CalculationOutputValues outputs = new CalculationOutputValues(
                 null,
-                r.capacityKw(),   // refrigerantCapacity
-                r.capacityKw(),   // evaporatorCapacity
-                r.powerKw(),      // powerInput
-                r.capacityKw() + r.powerKw(), // condenserCapacity
+                capKw,            // refrigerantCapacity
+                capKw,            // evaporatorCapacity
+                powKw,            // powerInput
+                capKw + powKw,    // condenserCapacity
                 0,                // current
-                r.copEer(),       // copEer
+                cop,              // copEer
                 0,                // massFlow
-                0);               // operatingFrequency
+                0,                // operatingFrequency
+                pressureDrop);    // pressureDrop (base 50 * glycol factor)
 
         // Adding to a project is the only flow that persists a report: render it,
         // store it in R2, and keep the URL on the ProjectDetails row.
         String pdfUrl = reportAppService.renderAndStore(
-                unit, mod, dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(), project, project.getUser());
+                unit, mod, dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(), project, project.getUser(),
+                dto.getGlycolType(), dto.getGlycolPercentage());
 
         ProjectDetails pd = new ProjectDetails();
         pd.setProject(project);
@@ -206,8 +217,11 @@ public class ProjectAppService {
 
         Mod mod = d.getMod() == null ? Mod.COOLING : d.getMod();
         String oldUrl = d.getPdfUrl();
+        // Reuse the stored glycol selection so the regenerated report recalculates with the
+        // same correction the user originally chose.
         String newUrl = reportAppService.renderAndStore(
-                unit, mod, in.getAmbient(), in.getEvapIn(), in.getEvapOut(), project, project.getUser());
+                unit, mod, in.getAmbient(), in.getEvapIn(), in.getEvapOut(), project, project.getUser(),
+                in.getMixtureType(), in.getMixtureRatio());
         d.setPdfUrl(newUrl);
         projectDetailsRepository.save(d);
 

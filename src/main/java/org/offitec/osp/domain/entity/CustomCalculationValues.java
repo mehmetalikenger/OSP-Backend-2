@@ -27,4 +27,11 @@ public class CustomCalculationValues {
 
     private double condIn;
     private double condOut;
+
+    // Glycol mixture selection, persisted so report regeneration can reuse it.
+    @Column(name = "mixture_type")
+    private String mixtureType;
+
+    @Column(name = "mixture_ratio")
+    private Integer mixtureRatio;
 }

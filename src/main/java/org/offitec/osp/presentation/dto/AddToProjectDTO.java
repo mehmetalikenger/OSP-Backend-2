@@ -22,4 +22,8 @@ public class AddToProjectDTO {
     private double evapOut;
     private double condIn;
     private double condOut;
+
+    // Optional glycol mixture correction (see GlycolCorrection).
+    private String glycolType;
+    private Integer glycolPercentage;
 }

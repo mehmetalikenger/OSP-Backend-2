@@ -1,5 +1,6 @@
 package org.offitec.osp.application.report;
 
+import org.offitec.osp.application.service.GlycolCorrection;
 import org.offitec.osp.application.service.UnitCalculationEngine;
 import org.offitec.osp.domain.entity.*;
 import org.offitec.osp.domain.enums.Mod;
@@ -52,7 +53,8 @@ public class ReportDataAssembler {
 
     public UnitReportModel assemble(Unit unit, Mod mod,
                                     double ambient, double evapIn, double evapOut,
-                                    Project project, User user) {
+                                    Project project, User user,
+                                    String glycolType, Integer glycolPercentage) {
 
         UnitDetails details = findDetails(unit, mod);
         TechSpecs ts = details != null ? details.getTechSpecs() : null;
@@ -63,11 +65,14 @@ public class ReportDataAssembler {
 
         UnitCalculationEngine.Result design = engine.compute(cspecs, unit.getCompressorQty(), ambient, evapOut);
 
+        // A selected glycol mixture scales capacity, power and pressure drop.
+        GlycolCorrection.Factors gf = GlycolCorrection.lookup(glycolType, glycolPercentage);
+
         // The "Output" block shows the values computed from THIS calculation (the entered
         // operating conditions), not the unit's stored/default specs.
-        double outCapacityKw = design.capacityKw();
-        double outCop = design.copEer();
-        double outPowerKw = design.powerKw();
+        double outCapacityKw = design.capacityKw() * gf.capacity();
+        double outPowerKw = design.powerKw() * gf.power();
+        double outCop = outPowerKw > 0 ? outCapacityKw / outPowerKw : design.copEer();
 
         // Flow rate is derived from the calculated cooling capacity (the value shown in the
         // Output table): capacity(kW) * 860 / 5000, so the two stay consistent.
@@ -78,13 +83,18 @@ public class ReportDataAssembler {
         List<UnitReportModel.FullLoadRow> fullLoad = new ArrayList<>();
         for (double a : FULL_LOAD_AMBIENTS) {
             UnitCalculationEngine.Result r = engine.compute(cspecs, unit.getCompressorQty(), a, evapOut);
+            double cap = r.capacityKw() * gf.capacity();
+            double pow = r.powerKw() * gf.power();
             fullLoad.add(UnitReportModel.FullLoadRow.builder()
                     .ambient(fmt1(a))
-                    .capacity(fmt4(r.capacityKw()))
-                    .power(fmt4(r.powerKw()))
-                    .eerCop(fmt4(r.copEer()))
+                    .capacity(fmt4(cap))
+                    .power(fmt4(pow))
+                    .eerCop(fmt4(pow > 0 ? cap / pow : r.copEer()))
                     .build());
         }
+
+        // Pressure drop (base 50 kPa) scaled by the glycol factor.
+        double pressureDropKpa = PRESSURE_DROP_KPA * gf.pressureDrop();
 
         // --- Working envelope bounds (fall back to sensible defaults if unset) ---
         double minOut = unit.getMinWaterOutlet();
@@ -135,7 +145,7 @@ public class ReportDataAssembler {
                 .evaporatorType(evaporatorType(ts))
                 .flowRate(fmt4(flowRate))
                 .waterPressure(fmt1(WATER_PRESSURE_BAR))
-                .pressureDrop(fmt0(PRESSURE_DROP_KPA))
+                .pressureDrop(fmt4(pressureDropKpa))
                 // Fans
                 .fanType(dash(unit.getFanType()))
                 .fanQty(String.valueOf(unit.getNumberOfFans()))
@@ -159,7 +169,7 @@ public class ReportDataAssembler {
                         .build())
                 .pressureCurve(UnitReportModel.PressureCurve.builder()
                         .designFlowRate(flowRate)
-                        .designPressureDrop(PRESSURE_DROP_KPA)
+                        .designPressureDrop(pressureDropKpa)
                         .build())
                 .build();
     }

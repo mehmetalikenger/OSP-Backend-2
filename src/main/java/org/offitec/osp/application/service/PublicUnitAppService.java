@@ -234,16 +234,19 @@ public class PublicUnitAppService {
                 specs.getPC1(), specs.getPC2(), specs.getPC3(), specs.getPC4(), specs.getPC5(),
                 specs.getPC6(), specs.getPC7(), specs.getPC8(), specs.getPC9(), specs.getPC10());
 
-        double cop = p > 0 ? q / p : 0;
-        double copEer = cop;
-        // The polynomials return power in WATTS; convert the totals to kW. COP/EER is a
-        // ratio, so it's unaffected by the conversion.
-        double totalQ = q * unit.getCompressorQty() / 1000.0;
-        double totalP = p * unit.getCompressorQty() / 1000.0;
+        // The polynomials return power in WATTS; convert the totals to kW. A selected glycol
+        // mixture scales capacity and power by its correction factors.
+        GlycolCorrection.Factors gf = GlycolCorrection.lookup(dto.getGlycolType(), dto.getGlycolPercentage());
+        double totalQ = q * unit.getCompressorQty() / 1000.0 * gf.capacity();
+        double totalP = p * unit.getCompressorQty() / 1000.0 * gf.power();
+        double copEer = totalP > 0 ? totalQ / totalP : 0;
+
+        double pressureDrop = 50.0 * gf.pressureDrop();
 
         CustomCalculationValues customVals = new CustomCalculationValues(
                 null,
-                dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(), dto.getCondIn(), dto.getCondOut()
+                dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(), dto.getCondIn(), dto.getCondOut(),
+                dto.getGlycolType(), dto.getGlycolPercentage()
         );
         customVals = customCalcValsRepository.save(customVals);
 
@@ -256,7 +259,8 @@ public class PublicUnitAppService {
                 0,
                 copEer,
                 0,
-                0
+                0,
+                pressureDrop
         );
         outputVals = calcOutputValsRepository.save(outputVals);
 

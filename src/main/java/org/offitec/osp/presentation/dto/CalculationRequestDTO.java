@@ -19,4 +19,9 @@ public class CalculationRequestDTO {
     private double evapOut;
     private double condIn;
     private double condOut;
+
+    // Optional glycol mixture correction. type e.g. "Ethylene Glycol" / "Propylene Glycol",
+    // percentage 5..50. When set, capacity/power are scaled by the correction factors.
+    private String glycolType;
+    private Integer glycolPercentage;
 }

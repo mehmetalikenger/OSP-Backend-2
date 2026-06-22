@@ -16,4 +16,8 @@ public class ReportRequestDTO {
     private double evapIn;
     private double evapOut;
     private Long projectId;           // optional
+
+    // Optional glycol mixture correction (see GlycolCorrection).
+    private String glycolType;
+    private Integer glycolPercentage;
 }
