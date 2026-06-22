@@ -9,7 +9,9 @@ spring:
       max-file-size: 25MB
       max-request-size: 25MB
   datasource:
-    url: ${DATABASE_URL}
+    # Railway's DATABASE_URL is "postgresql://user:pass@host:port/db", which pgjdbc/Hikari can't use.
+    # Build a proper JDBC URL from the component vars (also provided by Railway's Postgres service).
+    url: jdbc:postgresql://${PGHOST}:${PGPORT}/${PGDATABASE}
     username: ${PGUSER}
     password: ${PGPASSWORD}
   jpa:
