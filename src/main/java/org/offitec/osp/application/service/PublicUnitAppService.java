@@ -2,6 +2,8 @@ package org.offitec.osp.application.service;
 
 import org.offitec.osp.domain.entity.*;
 import org.offitec.osp.domain.enums.AssetType;
+import org.offitec.osp.domain.enums.CondenserType;
+import org.offitec.osp.domain.enums.EvaporatorType;
 import org.offitec.osp.domain.enums.Mod;
 import org.offitec.osp.domain.enums.UnitCategory;
 import org.offitec.osp.domain.enums.UnitTypeEnum;
@@ -357,6 +359,54 @@ public class PublicUnitAppService {
         }
 
         if (unit.getRefrigerant() != null) addSpec(specs, "Refrigerant", unit.getRefrigerant().getCode());
+
+        // Chassis is a unit-level selection.
+        if (unit.getChassis() != null) addSpec(specs, "Chassis Model", unit.getChassis().getModel());
+
+        // Component brand/model/type/capacity, taken from the first configured mode (shared across modes).
+        CompressorSpecs compressorSpecs = firstCompressorSpecs(unit);
+        if (compressorSpecs != null && compressorSpecs.getCompressor() != null) {
+            Compressor compressor = compressorSpecs.getCompressor();
+            addSpec(specs, "Compressor Brand", compressor.getBrand());
+            addSpec(specs, "Compressor Model", compressor.getModel());
+            if (compressor.getType() != null) addSpec(specs, "Compressor Type", compressor.getType().name());
+            addSpec(specs, "Compressor Capacity", capacityKw(compressorSpecs.getCapacity()));
+        }
+
+        CondenserSpecs condenserSpecs = firstCondenserSpecs(unit);
+        if (condenserSpecs != null && condenserSpecs.getCondenser() != null) {
+            Condenser condenser = condenserSpecs.getCondenser();
+            addSpec(specs, "Condenser Brand", condenser.getBrand());
+            addSpec(specs, "Condenser Model", condenser.getModel());
+            addSpec(specs, "Condenser Type", condenserTypeLabel(condenser.getType()));
+            addSpec(specs, "Condenser Capacity", capacityKw(condenserSpecs.getCapacity()));
+        }
+
+        EvaporatorSpecs evaporatorSpecs = firstEvaporatorSpecs(unit);
+        if (evaporatorSpecs != null && evaporatorSpecs.getEvaporator() != null) {
+            Evaporator evaporator = evaporatorSpecs.getEvaporator();
+            addSpec(specs, "Evaporator Brand", evaporator.getBrand());
+            addSpec(specs, "Evaporator Model", evaporator.getModel());
+            addSpec(specs, "Evaporator Type", evaporatorTypeLabel(evaporator.getType()));
+            addSpec(specs, "Evaporator Capacity", capacityKw(evaporatorSpecs.getCapacity()));
+        }
+
+        ExpansionValveSpecs expansionValveSpecs = firstExpansionValveSpecs(unit);
+        if (expansionValveSpecs != null && expansionValveSpecs.getExpansionValve() != null) {
+            ExpansionValve expansionValve = expansionValveSpecs.getExpansionValve();
+            addSpec(specs, "Expansion Valve Brand", expansionValve.getBrand());
+            addSpec(specs, "Expansion Valve Model", expansionValve.getModel());
+            addSpec(specs, "Expansion Valve Capacity", capacityKw(expansionValveSpecs.getCapacity()));
+        }
+
+        FourWayReversingValveSpecs fourWayValveSpecs = firstFourWayReversingValveSpecs(unit);
+        if (fourWayValveSpecs != null && fourWayValveSpecs.getFourWayReversingValve() != null) {
+            FourWayReversingValve fourWayValve = fourWayValveSpecs.getFourWayReversingValve();
+            addSpec(specs, "4-Way Reversing Valve Brand", fourWayValve.getBrand());
+            addSpec(specs, "4-Way Reversing Valve Model", fourWayValve.getModel());
+            addSpec(specs, "4-Way Reversing Valve Capacity", capacityKw(fourWayValveSpecs.getCapacity()));
+        }
+
         if (unit.getCompressorQty() > 0) addSpec(specs, "Compressors", String.valueOf(unit.getCompressorQty()));
         if (unit.getCondenserQty() > 0) addSpec(specs, "Condensers", String.valueOf(unit.getCondenserQty()));
         if (unit.getExpansionValveQty() > 0) addSpec(specs, "Expansion Valves", String.valueOf(unit.getExpansionValveQty()));
@@ -392,6 +442,76 @@ public class PublicUnitAppService {
         if (value != null && !value.isBlank()) {
             specs.add(new TechSpecItemDTO(label, value));
         }
+    }
+
+    // --- Component lookups (return the first occurrence across the unit's modes) ---
+
+    private CompressorSpecs firstCompressorSpecs(Unit unit) {
+        if (unit.getUnitDetails() == null) return null;
+        for (UnitDetails d : unit.getUnitDetails()) {
+            TechSpecs ts = d.getTechSpecs();
+            if (ts != null && ts.getCompressorSpecs() != null) return ts.getCompressorSpecs();
+        }
+        return null;
+    }
+
+    private CondenserSpecs firstCondenserSpecs(Unit unit) {
+        if (unit.getUnitDetails() == null) return null;
+        for (UnitDetails d : unit.getUnitDetails()) {
+            TechSpecs ts = d.getTechSpecs();
+            if (ts != null && ts.getCondenserSpecs() != null) return ts.getCondenserSpecs();
+        }
+        return null;
+    }
+
+    private EvaporatorSpecs firstEvaporatorSpecs(Unit unit) {
+        if (unit.getUnitDetails() == null) return null;
+        for (UnitDetails d : unit.getUnitDetails()) {
+            TechSpecs ts = d.getTechSpecs();
+            if (ts != null && ts.getEvaporatorSpecs() != null) return ts.getEvaporatorSpecs();
+        }
+        return null;
+    }
+
+    private ExpansionValveSpecs firstExpansionValveSpecs(Unit unit) {
+        if (unit.getUnitDetails() == null) return null;
+        for (UnitDetails d : unit.getUnitDetails()) {
+            TechSpecs ts = d.getTechSpecs();
+            if (ts != null && ts.getExpansionValveSpecs() != null) return ts.getExpansionValveSpecs();
+        }
+        return null;
+    }
+
+    private FourWayReversingValveSpecs firstFourWayReversingValveSpecs(Unit unit) {
+        if (unit.getUnitDetails() == null) return null;
+        for (UnitDetails d : unit.getUnitDetails()) {
+            TechSpecs ts = d.getTechSpecs();
+            if (ts != null && ts.getFourWayReversingValveSpecs() != null) return ts.getFourWayReversingValveSpecs();
+        }
+        return null;
+    }
+
+    private String capacityKw(double capacity) {
+        if (capacity <= 0) return null;
+        return fmtNum(capacity) + " kW";
+    }
+
+    // Type labels mirror the options shown in the admin component forms.
+
+    private String condenserTypeLabel(CondenserType type) {
+        if (type == null) return null;
+        return switch (type) {
+            case MICROCHANNEL -> "Microchannel";
+        };
+    }
+
+    private String evaporatorTypeLabel(EvaporatorType type) {
+        if (type == null) return null;
+        return switch (type) {
+            case PLATE -> "Plate";
+            case COIL -> "Coil";
+            case SHELL_AND_TUBE -> "Shell & Tube";
+        };
     }
 
     private Long currentUserId() {
