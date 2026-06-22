@@ -6,13 +6,15 @@ import org.offitec.osp.domain.enums.UnitCategory;
 import org.offitec.osp.domain.enums.UnitTypeEnum;
 import org.offitec.osp.presentation.dto.CalculationRequestDTO;
 import org.offitec.osp.presentation.dto.CalculationResultDTO;
+import org.offitec.osp.presentation.dto.PageResponse;
 import org.offitec.osp.presentation.dto.UnitCalcDataDTO;
 import org.offitec.osp.presentation.dto.UnitCardDTO;
 import org.offitec.osp.presentation.dto.UnitDetailPublicDTO;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -25,16 +27,30 @@ public class PublicUnitController {
         this.service = service;
     }
 
+    // Default page size for the catalog/saved lists. The frontend appends ?page=N to
+    // load more; size is fixed server-side to keep payloads bounded.
+    private static final int DEFAULT_PAGE_SIZE = 24;
+
+    private Pageable pageOf(int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = (size <= 0 || size > 100) ? DEFAULT_PAGE_SIZE : size;
+        return PageRequest.of(safePage, safeSize);
+    }
+
     @GetMapping("/chillers")
-    public List<UnitCardDTO> getChillers(@RequestParam String type) {
+    public PageResponse<UnitCardDTO> getChillers(@RequestParam String type,
+                                                 @RequestParam(defaultValue = "0") int page,
+                                                 @RequestParam(defaultValue = "24") int size) {
         UnitTypeEnum unitType = UnitTypeEnum.valueOf(type.trim().toUpperCase());
-        return service.getUnitsByType(UnitCategory.CHILLER, unitType);
+        return service.getUnitsByType(UnitCategory.CHILLER, unitType, pageOf(page, size));
     }
 
     @GetMapping("/heat-pumps")
-    public List<UnitCardDTO> getHeatPumps(@RequestParam String type) {
+    public PageResponse<UnitCardDTO> getHeatPumps(@RequestParam String type,
+                                                  @RequestParam(defaultValue = "0") int page,
+                                                  @RequestParam(defaultValue = "24") int size) {
         UnitTypeEnum unitType = UnitTypeEnum.valueOf(type.trim().toUpperCase());
-        return service.getUnitsByType(UnitCategory.HEAT_PUMP, unitType);
+        return service.getUnitsByType(UnitCategory.HEAT_PUMP, unitType, pageOf(page, size));
     }
 
     @GetMapping("/{id}")
@@ -59,12 +75,14 @@ public class PublicUnitController {
     }
 
     @GetMapping("/saved")
-    public List<UnitCardDTO> getSavedUnits(
+    public PageResponse<UnitCardDTO> getSavedUnits(
             @RequestParam(required = false) String category,
-            @RequestParam(required = false) String type) {
+            @RequestParam(required = false) String type,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "24") int size) {
         UnitCategory cat = category != null ? UnitCategory.valueOf(category.trim().toUpperCase()) : null;
         UnitTypeEnum unitType = type != null ? UnitTypeEnum.valueOf(type.trim().toUpperCase()) : null;
-        return service.getSavedUnits(cat, unitType);
+        return service.getSavedUnits(cat, unitType, pageOf(page, size));
     }
 
 }

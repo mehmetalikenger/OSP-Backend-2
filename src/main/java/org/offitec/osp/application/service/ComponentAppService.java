@@ -8,6 +8,7 @@ import org.offitec.osp.domain.exception.*;
 import org.offitec.osp.domain.service.ComponentDomainService;
 import org.offitec.osp.domain.service.AuditLogService;
 import org.offitec.osp.domain.port.UserRepositoryPort;
+import org.offitec.osp.infrastructure.config.EvictsUnitCaches;
 import org.offitec.osp.infrastructure.repository.*;
 import org.offitec.osp.presentation.dto.*;
 import org.springframework.stereotype.Service;
@@ -99,6 +100,7 @@ public class ComponentAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void editCompressor(Long id, CompressorDTO dto) {
 
         componentDomainService.validateUniqueModelForEdit(dto.getModel(), id);
@@ -118,6 +120,7 @@ public class ComponentAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void editCompressorSpecs(Long specId, CompressorSpecsDTO dto) {
 
         Optional<CompressorSpecs> dbSpecs = compressorSpecsRepository.findById(specId);
@@ -198,6 +201,7 @@ public class ComponentAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void editEvaporator(Long id, EvaporatorDTO dto) {
 
         componentDomainService.validateUniqueModelForEditEvaporator(dto.getModel(), id);
@@ -217,6 +221,7 @@ public class ComponentAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void editEvaporatorSpecs(Long specId, EvaporatorSpecsDTO dto) {
 
         Optional<EvaporatorSpecs> dbSpecs = evaporatorSpecsRepository.findById(specId);
@@ -272,6 +277,7 @@ public class ComponentAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void editCondenser(Long id, CondenserDTO dto) {
         componentDomainService.validateUniqueModelForEditCondenser(dto.getModel(), id);
         Optional<Condenser> dbCondenser = condenserRepository.findById(id);
@@ -286,6 +292,7 @@ public class ComponentAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void editCondenserSpecs(Long specId, CondenserSpecsDTO dto) {
         Optional<CondenserSpecs> dbSpecs = condenserSpecsRepository.findById(specId);
         if(dbSpecs.isEmpty()){
@@ -336,6 +343,7 @@ public class ComponentAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void editExpansionValve(Long id, ExpansionValveDTO dto) {
         componentDomainService.validateUniqueModelForEditExpansionValve(dto.getModel(), id);
         Optional<ExpansionValve> dbExpansionValve = expansionValveRepository.findById(id);
@@ -349,6 +357,7 @@ public class ComponentAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void editExpansionValveSpecs(Long specId, ExpansionValveSpecsDTO dto) {
         Optional<ExpansionValveSpecs> dbSpecs = expansionValveSpecsRepository.findById(specId);
         if(dbSpecs.isEmpty()){
@@ -399,6 +408,7 @@ public class ComponentAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void editFourWayReversingValve(Long id, FourWayReversingValveDTO dto) {
         componentDomainService.validateUniqueModelForEditFourWayReversingValve(dto.getModel(), id);
         Optional<FourWayReversingValve> dbValve = fourWayReversingValveRepository.findById(id);
@@ -412,6 +422,7 @@ public class ComponentAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void editFourWayReversingValveSpecs(Long specId, FourWayReversingValveSpecsDTO dto) {
         Optional<FourWayReversingValveSpecs> dbSpecs = fourWayReversingValveSpecsRepository.findById(specId);
         if(dbSpecs.isEmpty()){
@@ -450,6 +461,7 @@ public class ComponentAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void editChassis(Long id, ChassisDTO dto) {
         componentDomainService.validateUniqueModelForEditChassis(dto.getModel(), id);
         Optional<Chassis> dbChassis = chassisRepository.findById(id);
@@ -477,6 +489,7 @@ public class ComponentAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void editRefrigerant(Long id, RefrigerantDTO dto) {
         componentDomainService.validateUniqueCodeForEditRefrigerant(dto.getCode(), id);
         Optional<Refrigerant> dbRefrigerant = refrigerantRepository.findById(id);
@@ -510,6 +523,7 @@ public class ComponentAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void deleteCompressor(Long id, String adminEmail) {
         Compressor c = compressorRepository.findById(id)
                 .orElseThrow(() -> new CompressorDoesntExistException("Compressor doesn't exist."));
@@ -519,6 +533,7 @@ public class ComponentAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void deleteEvaporator(Long id, String adminEmail) {
         Evaporator e = evaporatorRepository.findById(id)
                 .orElseThrow(() -> new EvaporatorDoesntExistException("Evaporator doesn't exist."));
@@ -528,6 +543,7 @@ public class ComponentAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void deleteCondenser(Long id, String adminEmail) {
         Condenser c = condenserRepository.findById(id)
                 .orElseThrow(() -> new CondenserDoesntExistException("Condenser doesn't exist."));
@@ -537,6 +553,7 @@ public class ComponentAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void deleteExpansionValve(Long id, String adminEmail) {
         ExpansionValve ev = expansionValveRepository.findById(id)
                 .orElseThrow(() -> new ExpansionValveDoesntExistException("Expansion Valve doesn't exist."));
@@ -546,6 +563,7 @@ public class ComponentAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void deleteFourWayReversingValve(Long id, String adminEmail) {
         FourWayReversingValve v = fourWayReversingValveRepository.findById(id)
                 .orElseThrow(() -> new FourWayReversingValveDoesntExistException("4-Way Reversing Valve doesn't exist."));
@@ -555,6 +573,7 @@ public class ComponentAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void deleteChassis(Long id, String adminEmail) {
         Chassis ch = chassisRepository.findById(id)
                 .orElseThrow(() -> new ChassisDoesntExistException("Chassis doesn't exist."));
@@ -564,6 +583,7 @@ public class ComponentAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void deleteRefrigerant(Long id, String adminEmail) {
         Refrigerant r = refrigerantRepository.findById(id)
                 .orElseThrow(() -> new RefrigerantDoesntExistException("Refrigerant doesn't exist."));

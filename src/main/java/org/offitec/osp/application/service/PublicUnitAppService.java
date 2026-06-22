@@ -8,6 +8,7 @@ import org.offitec.osp.domain.enums.Mod;
 import org.offitec.osp.domain.enums.UnitCategory;
 import org.offitec.osp.domain.enums.UnitTypeEnum;
 import org.offitec.osp.domain.exception.UnitDoesntExistException;
+import org.offitec.osp.infrastructure.config.CacheConfig;
 import org.offitec.osp.infrastructure.repository.CalculationOutputValuesRepository;
 import org.offitec.osp.infrastructure.repository.CustomCalculationValuesRepository;
 import org.offitec.osp.infrastructure.repository.SavedUnitRepository;
@@ -20,8 +21,14 @@ import org.offitec.osp.presentation.dto.CalculationResultDTO;
 import org.offitec.osp.presentation.dto.DefCalcValuesPublicDTO;
 import org.offitec.osp.presentation.dto.TechSpecItemDTO;
 import org.offitec.osp.presentation.dto.UnitCalcDataDTO;
+import org.offitec.osp.presentation.dto.PageResponse;
 import org.offitec.osp.presentation.dto.UnitCardDTO;
 import org.offitec.osp.presentation.dto.UnitDetailPublicDTO;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -58,27 +65,51 @@ public class PublicUnitAppService {
         this.userRepository = userRepository;
     }
 
+    // Self-reference so the cached, user-independent loader is invoked through the Spring
+    // proxy (a plain in-class call would bypass the @Cacheable advice). @Lazy breaks the
+    // self-referential construction cycle.
+    @Autowired
+    @Lazy
+    private PublicUnitAppService self;
+
     // --- Listing ---
 
     @Transactional(readOnly = true)
-    public List<UnitCardDTO> getUnitsByType(UnitCategory category, UnitTypeEnum unitType) {
+    public PageResponse<UnitCardDTO> getUnitsByType(UnitCategory category, UnitTypeEnum unitType, Pageable pageable) {
         Long userId = currentUserId();
-        // Query 1: the cards (scalar fields + primary image + saved flag), one statement.
-        List<UnitCardDTO> cards = unitJpaRepository.findCards(category, unitType, userId);
-        // Query 2: per-mode capacities for all those units at once, stitched in below.
-        applyCapacities(cards);
-        return cards;
+        // Query 1: one page of cards (scalar fields + primary image + saved flag).
+        Page<UnitCardDTO> page = unitJpaRepository.findCards(category, unitType, userId, pageable);
+        // Query 2: per-mode capacities for just this page's units, stitched in below.
+        applyCapacities(page.getContent());
+        return toPageResponse(page);
     }
 
     // --- Detail ---
 
     @Transactional(readOnly = true)
     public UnitDetailPublicDTO getUnitDetail(Long id) {
-        Unit unit = unitJpaRepository.findById(id)
+        // The heavy, user-independent part (specs/images/description) is cached by id;
+        // only the per-user `saved` flag is computed per request and overlaid here.
+        UnitDetailPublicDTO base = self.loadStaticDetail(id);
+        Long userId = currentUserId();
+        boolean saved = userId != null && savedUnitRepository.existsByUserIdAndUnitId(userId, id);
+        return new UnitDetailPublicDTO(
+                base.getId(), base.getName(), base.getModel(), base.getDescription(),
+                base.getPrimaryImageUrl(), base.getIconUrls(), base.getSpecs(),
+                base.getUnitType(), base.getCategory(), saved
+        );
+    }
+
+    // Cached, user-independent unit detail (saved = false). Loaded via a single
+    // fetch-join query so it doesn't walk the lazy component graph. Evicted on admin
+    // unit/asset writes (see UnitAppService @CacheEvict).
+    @Cacheable(value = CacheConfig.UNIT_DETAIL, key = "#id")
+    @Transactional(readOnly = true)
+    public UnitDetailPublicDTO loadStaticDetail(Long id) {
+        Unit unit = unitJpaRepository.findDetailGraphById(id)
                 .orElseThrow(() -> new UnitDoesntExistException("Unit not found."));
         if (unit.isDeleted()) throw new UnitDoesntExistException("Unit not found.");
-        Long userId = currentUserId();
-        return toDetail(unit, userId);
+        return toDetail(unit);
     }
 
     // --- Save / Unsave ---
@@ -105,18 +136,27 @@ public class PublicUnitAppService {
     // --- Saved units listing ---
 
     @Transactional(readOnly = true)
-    public List<UnitCardDTO> getSavedUnits(UnitCategory category, UnitTypeEnum unitType) {
+    public PageResponse<UnitCardDTO> getSavedUnits(UnitCategory category, UnitTypeEnum unitType, Pageable pageable) {
         Long userId = currentUserId();
-        List<UnitCardDTO> cards = unitJpaRepository.findSavedCards(userId, category, unitType);
-        applyCapacities(cards);
-        return cards;
+        Page<UnitCardDTO> page = unitJpaRepository.findSavedCards(userId, category, unitType, pageable);
+        applyCapacities(page.getContent());
+        return toPageResponse(page);
+    }
+
+    private <T> PageResponse<T> toPageResponse(Page<T> page) {
+        return new PageResponse<>(
+                page.getContent(), page.getNumber(), page.getSize(),
+                page.getTotalElements(), page.getTotalPages(), page.hasNext());
     }
 
     // --- Calculation page data ---
 
+    // Fully user-independent, so the whole payload is cached by id (evicted on admin
+    // unit/asset writes). Loaded via the single fetch-join query.
+    @Cacheable(value = CacheConfig.UNIT_CALC_DATA, key = "#id")
     @Transactional(readOnly = true)
     public UnitCalcDataDTO getUnitCalcData(Long id) {
-        Unit unit = unitJpaRepository.findById(id)
+        Unit unit = unitJpaRepository.findDetailGraphById(id)
                 .orElseThrow(() -> new UnitDoesntExistException("Unit not found."));
 
         List<CalcAssetDTO> images = new ArrayList<>();
@@ -311,7 +351,9 @@ public class PublicUnitAppService {
         return Character.toUpperCase(lower.charAt(0)) + lower.substring(1); // Heating / Cooling
     }
 
-    private UnitDetailPublicDTO toDetail(Unit unit, Long userId) {
+    // Builds the user-independent detail (saved = false); the caller overlays the
+    // per-user saved flag. Kept free of request state so the result is cacheable.
+    private UnitDetailPublicDTO toDetail(Unit unit) {
         String primaryImageUrl = null;
         List<String> iconUrls = new ArrayList<>();
 
@@ -327,7 +369,6 @@ public class PublicUnitAppService {
         }
 
         List<TechSpecItemDTO> specs = buildSpecs(unit);
-        boolean saved = userId != null && savedUnitRepository.existsByUserIdAndUnitId(userId, unit.getId());
 
         return new UnitDetailPublicDTO(
                 unit.getId(),
@@ -339,7 +380,7 @@ public class PublicUnitAppService {
                 specs,
                 unit.getUnitType().name(),
                 unit.getCategory().name(),
-                saved
+                false
         );
     }
 
@@ -517,7 +558,11 @@ public class PublicUnitAppService {
     private Long currentUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated()) return null;
+        // JwtFilter stashes the user id in the authentication details, so we avoid a
+        // per-request DB lookup. Fall back to email if it isn't present for some reason.
+        if (auth.getDetails() instanceof Long id) return id;
         String email = auth.getName();
+        if (email == null) return null;
         return userRepository.findByEmail(email).map(User::getId).orElse(null);
     }
 }

@@ -9,6 +9,7 @@ import org.offitec.osp.domain.exception.*;
 import org.offitec.osp.domain.service.UnitDomainService;
 import org.offitec.osp.domain.service.AuditLogService;
 import org.offitec.osp.domain.port.UserRepositoryPort;
+import org.offitec.osp.infrastructure.config.EvictsUnitCaches;
 import org.offitec.osp.infrastructure.repository.*;
 import org.offitec.osp.infrastructure.storage.S3Service;
 import org.offitec.osp.presentation.dto.*;
@@ -70,6 +71,7 @@ public class UnitAppService {
     // --- Create (chiller: shell + common + single cooling mode in one shot) ---
 
     @Transactional
+    @EvictsUnitCaches
     public Long addChiller(ChillerWrapperDTO dto) {
 
         ChillerDTO chillerDto = dto.getChillerDto();
@@ -250,6 +252,7 @@ public class UnitAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void confirmAssets(Long unitId, AssetConfirmRequestDTO request) {
         Unit unit = unitJpaRepository.findById(unitId)
                 .orElseThrow(() -> new UnitDoesntExistException("Unit doesn't exist."));
@@ -392,6 +395,7 @@ public class UnitAppService {
     // --- Update (chiller) ---
 
     @Transactional
+    @EvictsUnitCaches
     public void editUnit(Long id, ChillerWrapperDTO dto) {
 
         Unit unit = unitJpaRepository.findById(id)
@@ -424,6 +428,7 @@ public class UnitAppService {
     // --- Heat pump: shell (model + common tech), created without modes ---
 
     @Transactional
+    @EvictsUnitCaches
     public Long addHeatPump(HeatPumpModelWrapperDTO dto) {
 
         HeatPumpDTO hp = dto.getHeatPumpDto();
@@ -445,6 +450,7 @@ public class UnitAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void uploadAssets(Long unitId, AssetUploadDTO dto) {
 
         Unit unit = unitJpaRepository.findById(unitId)
@@ -468,6 +474,7 @@ public class UnitAppService {
     // --- Heat pump: attach one mode's details to an existing heat pump ---
 
     @Transactional
+    @EvictsUnitCaches
     public void addHeatPumpDetails(HeatPumpDetailsWrapperDTO dto) {
 
         Unit unit = unitJpaRepository.findById(dto.getHeatPumpId())
@@ -588,6 +595,7 @@ public class UnitAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void editHeatPump(Long id, HeatPumpModelWrapperDTO dto) {
 
         Unit unit = unitJpaRepository.findById(id)
@@ -610,6 +618,7 @@ public class UnitAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void editHeatPumpDetails(HeatPumpDetailsWrapperDTO dto) {
 
         Unit unit = unitJpaRepository.findById(dto.getHeatPumpId())
@@ -738,6 +747,7 @@ public class UnitAppService {
     // --- Asset management ---
 
     @Transactional
+    @EvictsUnitCaches
     public void deleteAsset(Long assetId) {
         UnitAsset asset = unitAssetRepository.findById(assetId)
                 .orElseThrow(() -> new RuntimeException("Asset not found: " + assetId));
@@ -753,6 +763,7 @@ public class UnitAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void setPrimaryAsset(Long assetId) {
         UnitAsset target = unitAssetRepository.findById(assetId)
                 .orElseThrow(() -> new RuntimeException("Asset not found: " + assetId));
@@ -773,6 +784,7 @@ public class UnitAppService {
     // Soft-delete a unit: kept in the DB (saved-units / projects still reference it),
     // hidden from all listings, and recorded in the audit log.
     @Transactional
+    @EvictsUnitCaches
     public void deleteUnit(Long id, String adminEmail) {
         Unit unit = unitJpaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Unit not found: " + id));
