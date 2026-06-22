@@ -85,6 +85,13 @@ public class ProjectAppService {
         return out;
     }
 
+    // Admin-only: every project across all users, flattened for the admin table. No
+    // ownership scoping (the /admin/** route is already restricted to the ADMIN authority).
+    @Transactional(readOnly = true)
+    public List<org.offitec.osp.presentation.dto.AdminProjectRowDTO> listAllForAdmin() {
+        return projectRepository.findAllAdminRows();
+    }
+
     @Transactional(readOnly = true)
     public ProjectDTO get(Long projectId) {
         Project project = requireOwnedProject(projectId);
