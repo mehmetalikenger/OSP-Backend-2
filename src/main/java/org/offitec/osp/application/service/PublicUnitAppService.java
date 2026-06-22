@@ -79,8 +79,9 @@ public class PublicUnitAppService {
         Long userId = currentUserId();
         // Query 1: one page of cards (scalar fields + primary image + saved flag).
         Page<UnitCardDTO> page = unitJpaRepository.findCards(category, unitType, userId, pageable);
-        // Query 2: per-mode capacities for just this page's units, stitched in below.
+        // Query 2 & 3: per-mode capacities and icon URLs for just this page's units.
         applyCapacities(page.getContent());
+        applyIcons(page.getContent());
         return toPageResponse(page);
     }
 
@@ -140,6 +141,7 @@ public class PublicUnitAppService {
         Long userId = currentUserId();
         Page<UnitCardDTO> page = unitJpaRepository.findSavedCards(userId, category, unitType, pageable);
         applyCapacities(page.getContent());
+        applyIcons(page.getContent());
         return toPageResponse(page);
     }
 
@@ -232,10 +234,12 @@ public class PublicUnitAppService {
                 specs.getPC1(), specs.getPC2(), specs.getPC3(), specs.getPC4(), specs.getPC5(),
                 specs.getPC6(), specs.getPC7(), specs.getPC8(), specs.getPC9(), specs.getPC10());
 
-        double totalQ = q * unit.getCompressorQty();
-        double totalP = p * unit.getCompressorQty();
-        double cop = totalP > 0 ? totalQ / totalP : 0;
+        double cop = p > 0 ? q / p : 0;
         double copEer = cop;
+        // The polynomials return power in WATTS; convert the totals to kW. COP/EER is a
+        // ratio, so it's unaffected by the conversion.
+        double totalQ = q * unit.getCompressorQty() / 1000.0;
+        double totalP = p * unit.getCompressorQty() / 1000.0;
 
         CustomCalculationValues customVals = new CustomCalculationValues(
                 null,
@@ -291,7 +295,7 @@ public class PublicUnitAppService {
 
     // A unit's capacity for one mode. Used to format the capacity label the same way
     // for both the catalog cards and the detail/spec views.
-    private record ModeCapacity(Mod mod, double capacity) {}
+    private record ModeCapacity(Mod mod, double capacity, double maxCapacity) {}
 
     // Fills each card's capacity from a SINGLE batched query over all the units'
     // modes, instead of touching the database once per unit (which was the N+1).
@@ -300,17 +304,35 @@ public class PublicUnitAppService {
 
         List<Long> unitIds = cards.stream().map(UnitCardDTO::getId).collect(Collectors.toList());
 
-        // Group the flat (unitId, mod, capacity) rows by unit id.
+        // Group the flat (unitId, mod, capacity, maxCapacity) rows by unit id.
         Map<Long, List<ModeCapacity>> byUnit = unitDetailsRepository.findModeCapacitiesByUnitIds(unitIds)
                 .stream()
                 .collect(Collectors.groupingBy(
                         row -> (Long) row[0],
                         Collectors.mapping(
-                                row -> new ModeCapacity((Mod) row[1], ((Number) row[2]).doubleValue()),
+                                row -> new ModeCapacity((Mod) row[1],
+                                        row[2] != null ? ((Number) row[2]).doubleValue() : 0.0,
+                                        row[3] != null ? ((Number) row[3]).doubleValue() : 0.0),
                                 Collectors.toList())));
 
         for (UnitCardDTO card : cards) {
             card.setCapacityRange(formatCapacity(byUnit.get(card.getId())));
+        }
+    }
+
+    // Fills each card's icon URLs from a SINGLE batched query over all the units' icon
+    // assets (same N+1-avoidance as applyCapacities).
+    private void applyIcons(List<UnitCardDTO> cards) {
+        if (cards.isEmpty()) return;
+        List<Long> unitIds = cards.stream().map(UnitCardDTO::getId).collect(Collectors.toList());
+
+        Map<Long, List<String>> byUnit = unitJpaRepository.findIconUrls(unitIds).stream()
+                .collect(Collectors.groupingBy(
+                        row -> (Long) row[0],
+                        Collectors.mapping(row -> (String) row[1], Collectors.toList())));
+
+        for (UnitCardDTO card : cards) {
+            card.setIconUrls(byUnit.getOrDefault(card.getId(), List.of()));
         }
     }
 
@@ -321,25 +343,35 @@ public class PublicUnitAppService {
         List<ModeCapacity> modes = new ArrayList<>();
         for (UnitDetails d : unit.getUnitDetails()) {
             if (d.getTechSpecs() != null) {
-                modes.add(new ModeCapacity(d.getMod(), d.getTechSpecs().getCapacity()));
+                Double max = d.getTechSpecs().getMaxCapacity();
+                modes.add(new ModeCapacity(d.getMod(), d.getTechSpecs().getCapacity(),
+                        max != null ? max : 0.0));
             }
         }
         return formatCapacity(modes);
     }
 
-    // Single mode -> "38.0 kW". Multiple modes -> "45.0 kW (Heating), 38.0 kW (Cooling)"
-    // with Heating listed first.
+    // Single mode -> "38.0 - 45.0 kW". Multiple modes -> "45.0 - 52.0 kW (Heating), ..."
+    // with Heating listed first. When a mode has no max capacity, just the single value.
     private String formatCapacity(List<ModeCapacity> modes) {
         if (modes == null || modes.isEmpty()) return null;
 
         if (modes.size() == 1) {
-            return String.format("%.1f kW", modes.get(0).capacity());
+            return capRange(modes.get(0));
         }
 
         return modes.stream()
                 .sorted(Comparator.comparingInt(m -> modeOrder(m.mod())))
-                .map(m -> String.format("%.1f kW (%s)", m.capacity(), modeLabel(m.mod())))
+                .map(m -> capRange(m) + " (" + modeLabel(m.mod()) + ")")
                 .collect(Collectors.joining(", "));
+    }
+
+    // "38.0 - 45.0 kW" when a max capacity is set, otherwise "38.0 kW".
+    private String capRange(ModeCapacity m) {
+        if (m.maxCapacity() > 0 && m.maxCapacity() > m.capacity()) {
+            return String.format("%.1f - %.1f kW", m.capacity(), m.maxCapacity());
+        }
+        return String.format("%.1f kW", m.capacity());
     }
 
     private int modeOrder(Mod mod) {
@@ -412,6 +444,14 @@ public class PublicUnitAppService {
             addSpec(specs, "Compressor Model", compressor.getModel());
             if (compressor.getType() != null) addSpec(specs, "Compressor Type", compressor.getType().name());
             addSpec(specs, "Compressor Capacity", capacityKw(compressorSpecs.getCapacity()));
+            // MOC = compressor qty * per-compressor MOC; LRA shown as-is.
+            if (compressor.getMoc() != null && compressor.getMoc() > 0) {
+                double totalMoc = compressor.getMoc() * Math.max(unit.getCompressorQty(), 1);
+                addSpec(specs, "MOC", fmtNum(totalMoc) + " A");
+            }
+            if (compressor.getLra() != null && compressor.getLra() > 0) {
+                addSpec(specs, "LRA", fmtNum(compressor.getLra()) + " A");
+            }
         }
 
         CondenserSpecs condenserSpecs = firstCondenserSpecs(unit);
@@ -453,7 +493,11 @@ public class PublicUnitAppService {
         if (unit.getExpansionValveQty() > 0) addSpec(specs, "Expansion Valves", String.valueOf(unit.getExpansionValveQty()));
         if (unit.getNumberOfFans() > 0) addSpec(specs, "Number of Fans", String.valueOf(unit.getNumberOfFans()));
         if (unit.getFanDiameter() > 0) addSpec(specs, "Fan Diameter", fmtNum(unit.getFanDiameter()) + " mm");
-        if (unit.getAirflowRate() > 0) addSpec(specs, "Airflow Rate", fmtNum(unit.getAirflowRate()) + " m³/h");
+        if (unit.getAirflowRate() > 0) {
+            // Total air flow = fan quantity * per-fan air flow rate.
+            double totalAirflow = Math.max(unit.getNumberOfFans(), 1) * unit.getAirflowRate();
+            addSpec(specs, "Airflow Rate", fmtNum(totalAirflow) + " m³/h");
+        }
         if (unit.getFanPI() > 0) addSpec(specs, "Fan Power Input", fmtNum(unit.getFanPI()) + " kW");
         if (unit.getWidth() > 0 && unit.getHeight() > 0 && unit.getLength() > 0) {
             addSpec(specs, "Dimensions (W×H×L)", String.format("%.0f × %.0f × %.0f mm", unit.getWidth(), unit.getHeight(), unit.getLength()));
@@ -468,6 +512,8 @@ public class PublicUnitAppService {
         if (unit.getSuctionLineDiameter() != null && !unit.getSuctionLineDiameter().isBlank()) {
             addSpec(specs, "Suction Line Diameter", unit.getSuctionLineDiameter());
         }
+        addSpec(specs, "Water Inlet Connection", unit.getWaterInletConnection());
+        addSpec(specs, "Water Outlet Connection", unit.getWaterOutletConnection());
 
         return specs;
     }

@@ -15,11 +15,11 @@ import java.util.Optional;
 public interface UnitDetailsRepository extends JpaRepository<UnitDetails, Long> {
     Optional<UnitDetails> findByUnitIdAndMod(Long unitId, Mod mod);
 
-    // All (unitId, mod, capacity) rows for the given units in ONE query, so the
-    // catalog can build each card's per-mode capacity string without an N+1.
-    // Returns Object[]{ Long unitId, Mod mod, double capacity }.
+    // All (unitId, mod, capacity, maxCapacity) rows for the given units in ONE query, so
+    // the catalog can build each card's per-mode capacity range without an N+1.
+    // Returns Object[]{ Long unitId, Mod mod, double capacity, double maxCapacity }.
     @Query("""
-            SELECT d.unit.id, d.mod, ts.capacity
+            SELECT d.unit.id, d.mod, ts.capacity, ts.maxCapacity
             FROM UnitDetails d JOIN d.techSpecs ts
             WHERE d.unit.id IN :unitIds
             """)

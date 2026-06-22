@@ -9,6 +9,7 @@ import lombok.Setter;
 public class UnitTechSpecsDTO {
 
     public double capacity;
+    public double maxCapacity;
 
     @NotNull(message = "Compressor must be selected.")
     public Long compressorSpecsId;
@@ -41,6 +42,7 @@ public class UnitTechSpecsDTO {
     public double width;
     public double length;
     public double height;
+    public String fanType;
     public int numberOfFans;
     public double fanDiameter;
     public double airflowRate;
@@ -48,6 +50,8 @@ public class UnitTechSpecsDTO {
     public String liquidLineDiameter;
     public String suctionLineDiameter;
     public double gasTank;
+    public String waterInletConnection;
+    public String waterOutletConnection;
 
     // Working envelope for the report's Working Limit graph (safe-area bounds).
     public double minWaterInlet;

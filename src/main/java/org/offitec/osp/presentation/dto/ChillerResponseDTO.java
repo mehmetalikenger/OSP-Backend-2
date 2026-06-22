@@ -28,6 +28,7 @@ public class ChillerResponseDTO {
     // Technical specifications. Component selections are exposed as their *specs* ids
     // so the frontend can preselect the matching dropdown option.
     private double capacity;
+    private double maxCapacity;
     private Long compressorSpecsId;
     private int compressorQty;
     private Long condenserSpecsId;
@@ -45,6 +46,7 @@ public class ChillerResponseDTO {
     private double width;
     private double length;
     private double height;
+    private String fanType;
     private int numberOfFans;
     private double fanDiameter;
     private double airflowRate;
@@ -52,6 +54,8 @@ public class ChillerResponseDTO {
     private String liquidLineDiameter;
     private String suctionLineDiameter;
     private double gasTank;
+    private String waterInletConnection;
+    private String waterOutletConnection;
 
     // Working envelope (safe-area bounds for the report's Working Limit graph).
     private double minWaterInlet;

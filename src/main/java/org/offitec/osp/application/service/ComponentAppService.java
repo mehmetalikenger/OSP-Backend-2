@@ -64,6 +64,8 @@ public class ComponentAppService {
         compressor.setType(CompressorKind.valueOf(dto.getType().toUpperCase()));
         compressor.setBrand(dto.getBrand());
         compressor.setModel(dto.getModel());
+        compressor.setMoc(dto.getMoc());
+        compressor.setLra(dto.getLra());
 
         compressorRepository.save(compressor);
     }
@@ -115,6 +117,8 @@ public class ComponentAppService {
         compressor.setType(CompressorKind.valueOf(dto.getType().toUpperCase()));
         compressor.setBrand(dto.getBrand());
         compressor.setModel(dto.getModel());
+        compressor.setMoc(dto.getMoc());
+        compressor.setLra(dto.getLra());
 
         compressorRepository.save(compressor);
     }

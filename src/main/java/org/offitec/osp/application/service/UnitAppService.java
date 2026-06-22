@@ -358,6 +358,7 @@ public class UnitAppService {
         r.setWidth(unit.getWidth());
         r.setLength(unit.getLength());
         r.setHeight(unit.getHeight());
+        r.setFanType(unit.getFanType());
         r.setNumberOfFans(unit.getNumberOfFans());
         r.setFanDiameter(unit.getFanDiameter());
         r.setAirflowRate(unit.getAirflowRate());
@@ -365,6 +366,8 @@ public class UnitAppService {
         r.setLiquidLineDiameter(unit.getLiquidLineDiameter());
         r.setSuctionLineDiameter(unit.getSuctionLineDiameter());
         r.setGasTank(unit.getGasTank());
+        r.setWaterInletConnection(unit.getWaterInletConnection());
+        r.setWaterOutletConnection(unit.getWaterOutletConnection());
         r.setMinWaterInlet(unit.getMinWaterInlet());
         r.setMaxWaterInlet(unit.getMaxWaterInlet());
         r.setMinWaterOutlet(unit.getMinWaterOutlet());
@@ -374,6 +377,7 @@ public class UnitAppService {
 
         // per-mode (tech specs)
         r.setCapacity(ts.getCapacity());
+        r.setMaxCapacity(ts.getMaxCapacity() != null ? ts.getMaxCapacity() : 0.0);
         r.setCopErr(ts.getCopErr());
         r.setCondenserRequiredDuty(ts.getCondenserRequiredDuty());
         r.setQuietCondenserRequiredDuty(ts.getQuietCondenserRequiredDuty());
@@ -550,6 +554,7 @@ public class UnitAppService {
         r.setWidth(unit.getWidth());
         r.setLength(unit.getLength());
         r.setHeight(unit.getHeight());
+        r.setFanType(unit.getFanType());
         r.setNumberOfFans(unit.getNumberOfFans());
         r.setFanDiameter(unit.getFanDiameter());
         r.setAirflowRate(unit.getAirflowRate());
@@ -557,6 +562,8 @@ public class UnitAppService {
         r.setLiquidLineDiameter(unit.getLiquidLineDiameter());
         r.setSuctionLineDiameter(unit.getSuctionLineDiameter());
         r.setGasTank(unit.getGasTank());
+        r.setWaterInletConnection(unit.getWaterInletConnection());
+        r.setWaterOutletConnection(unit.getWaterOutletConnection());
 
         List<HeatPumpModeDTO> modes = new ArrayList<>();
         if (unit.getUnitDetails() != null) {
@@ -567,6 +574,7 @@ public class UnitAppService {
                 HeatPumpModeDTO m = new HeatPumpModeDTO();
                 m.setMod(d.getMod().name());
                 m.setCapacity(ts.getCapacity());
+                m.setMaxCapacity(ts.getMaxCapacity() != null ? ts.getMaxCapacity() : 0.0);
                 m.setCopErr(ts.getCopErr());
                 m.setCondenserRequiredDuty(ts.getCondenserRequiredDuty());
                 m.setQuietCondenserRequiredDuty(ts.getQuietCondenserRequiredDuty());
@@ -653,6 +661,7 @@ public class UnitAppService {
         unit.setWidth(d.getWidth());
         unit.setLength(d.getLength());
         unit.setHeight(d.getHeight());
+        unit.setFanType(d.getFanType());
         unit.setNumberOfFans(d.getNumberOfFans());
         unit.setFanDiameter(d.getFanDiameter());
         unit.setAirflowRate(d.getAirflowRate());
@@ -660,6 +669,8 @@ public class UnitAppService {
         unit.setLiquidLineDiameter(d.getLiquidLineDiameter());
         unit.setSuctionLineDiameter(d.getSuctionLineDiameter());
         unit.setGasTank(d.getGasTank());
+        unit.setWaterInletConnection(d.getWaterInletConnection());
+        unit.setWaterOutletConnection(d.getWaterOutletConnection());
         unit.setMinWaterInlet(d.getMinWaterInlet());
         unit.setMaxWaterInlet(d.getMaxWaterInlet());
         unit.setMinWaterOutlet(d.getMinWaterOutlet());
@@ -671,6 +682,7 @@ public class UnitAppService {
     // Per-mode attributes + the component spec points selected for that mode.
     void applyModeSpecs(TechSpecs ts, UnitTechSpecsDTO d) {
         ts.setCapacity(d.getCapacity());
+        ts.setMaxCapacity(d.getMaxCapacity());
         ts.setCopErr(d.getCopErr());
         ts.setCondenserRequiredDuty(d.getCondenserRequiredDuty());
         ts.setQuietCondenserRequiredDuty(d.getQuietCondenserRequiredDuty());
@@ -706,6 +718,7 @@ public class UnitAppService {
         unit.setWidth(d.getWidth());
         unit.setLength(d.getLength());
         unit.setHeight(d.getHeight());
+        unit.setFanType(d.getFanType());
         unit.setNumberOfFans(d.getNumberOfFans());
         unit.setFanDiameter(d.getFanDiameter());
         unit.setAirflowRate(d.getAirflowRate());
@@ -713,6 +726,8 @@ public class UnitAppService {
         unit.setLiquidLineDiameter(d.getLiquidLineDiameter());
         unit.setSuctionLineDiameter(d.getSuctionLineDiameter());
         unit.setGasTank(d.getGasTank());
+        unit.setWaterInletConnection(d.getWaterInletConnection());
+        unit.setWaterOutletConnection(d.getWaterOutletConnection());
         unit.setMinWaterInlet(d.getMinWaterInlet());
         unit.setMaxWaterInlet(d.getMaxWaterInlet());
         unit.setMinWaterOutlet(d.getMinWaterOutlet());
@@ -723,6 +738,7 @@ public class UnitAppService {
 
     void applyModeSpecs(TechSpecs ts, UnitModeSpecsDTO d) {
         ts.setCapacity(d.getCapacity());
+        ts.setMaxCapacity(d.getMaxCapacity());
         ts.setCopErr(d.getCopErr());
         ts.setCondenserRequiredDuty(d.getCondenserRequiredDuty());
         ts.setQuietCondenserRequiredDuty(d.getQuietCondenserRequiredDuty());

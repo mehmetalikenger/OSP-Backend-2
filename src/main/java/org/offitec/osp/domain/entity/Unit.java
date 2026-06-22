@@ -70,6 +70,9 @@ public class Unit {
     private double length;
     private double height;
 
+    @Column(name = "fan_type")
+    private String fanType;
+
     @Column(name = "number_of_fans")
     private int numberOfFans;
 
@@ -90,6 +93,12 @@ public class Unit {
 
     @Column(name = "gas_tank")
     private double gasTank;
+
+    @Column(name = "water_inlet_connection")
+    private String waterInletConnection;
+
+    @Column(name = "water_outlet_connection")
+    private String waterOutletConnection;
 
     // --- Working envelope (used to draw the safe area of the Working Limit graph in the report) ---
 

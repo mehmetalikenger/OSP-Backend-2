@@ -18,4 +18,8 @@ public class CompressorDTO {
     @NotBlank(message = "Compressor type can't be empty.")
     @Pattern(regexp = "^(?i)(RC|SC|SCR|ISCR)$", message = "Invalid compressor type.")
     private String type;
+
+    // Maximum Operating Current and Locked Rotor Amperage (A).
+    private double moc;
+    private double lra;
 }

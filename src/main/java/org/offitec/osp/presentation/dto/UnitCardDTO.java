@@ -5,6 +5,9 @@ import lombok.Setter;
 import org.offitec.osp.domain.enums.UnitCategory;
 import org.offitec.osp.domain.enums.UnitTypeEnum;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Getter
 @Setter
 public class UnitCardDTO {
@@ -17,6 +20,8 @@ public class UnitCardDTO {
     private String unitType;
     private String category;
     private boolean saved;
+    // Icon (feature) image URLs, filled by the service from a batched query.
+    private List<String> iconUrls = new ArrayList<>();
 
     // Constructor used by the catalog projection query (UnitJpaRepository.findCards /
     // findSavedCards). It takes the enums straight from the entity and stores them as

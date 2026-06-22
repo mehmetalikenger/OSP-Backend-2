@@ -99,6 +99,16 @@ public interface UnitJpaRepository extends JpaRepository<Unit, Long>, UnitReposi
             """)
     List<Object[]> findPrimaryImageUrls(@Param("unitIds") List<Long> unitIds);
 
+    // Icon image URLs for a set of units in one query. Each row is [unitId, url]. Used to
+    // show the unit's feature icons on catalog/saved cards without lazily loading each
+    // unit's asset collection.
+    @Query("""
+            SELECT a.unit.id, a.url FROM UnitAsset a
+            WHERE a.unit.id IN :unitIds
+              AND a.assetType = org.offitec.osp.domain.enums.AssetType.ICON
+            """)
+    List<Object[]> findIconUrls(@Param("unitIds") List<Long> unitIds);
+
     // Loads the whole detail/calc graph in ONE query so the spec/calc views don't
     // walk a chain of lazy associations (unit -> details -> techSpecs -> each component
     // spec -> component). Only collection fetched is u.unitDetails (a single bag, so no

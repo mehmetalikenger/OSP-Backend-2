@@ -28,6 +28,7 @@ public class HeatPumpResponseDTO {
     private double width;
     private double length;
     private double height;
+    private String fanType;
     private int numberOfFans;
     private double fanDiameter;
     private double airflowRate;
@@ -35,6 +36,8 @@ public class HeatPumpResponseDTO {
     private String liquidLineDiameter;
     private String suctionLineDiameter;
     private double gasTank;
+    private String waterInletConnection;
+    private String waterOutletConnection;
 
     private List<HeatPumpModeDTO> modes;
 }
