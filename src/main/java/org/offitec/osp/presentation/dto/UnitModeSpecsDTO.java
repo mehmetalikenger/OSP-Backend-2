@@ -8,6 +8,7 @@ import lombok.Getter;
 public class UnitModeSpecsDTO {
 
     public double capacity;
+    public double maxCapacity;
     public double copErr;
     public double condenserRequiredDuty;
     public double quietCondenserRequiredDuty;

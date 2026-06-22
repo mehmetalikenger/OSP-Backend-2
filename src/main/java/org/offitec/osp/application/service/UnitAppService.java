@@ -9,6 +9,7 @@ import org.offitec.osp.domain.exception.*;
 import org.offitec.osp.domain.service.UnitDomainService;
 import org.offitec.osp.domain.service.AuditLogService;
 import org.offitec.osp.domain.port.UserRepositoryPort;
+import org.offitec.osp.infrastructure.config.EvictsUnitCaches;
 import org.offitec.osp.infrastructure.repository.*;
 import org.offitec.osp.infrastructure.storage.S3Service;
 import org.offitec.osp.presentation.dto.*;
@@ -70,6 +71,7 @@ public class UnitAppService {
     // --- Create (chiller: shell + common + single cooling mode in one shot) ---
 
     @Transactional
+    @EvictsUnitCaches
     public Long addChiller(ChillerWrapperDTO dto) {
 
         ChillerDTO chillerDto = dto.getChillerDto();
@@ -250,6 +252,7 @@ public class UnitAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void confirmAssets(Long unitId, AssetConfirmRequestDTO request) {
         Unit unit = unitJpaRepository.findById(unitId)
                 .orElseThrow(() -> new UnitDoesntExistException("Unit doesn't exist."));
@@ -355,6 +358,7 @@ public class UnitAppService {
         r.setWidth(unit.getWidth());
         r.setLength(unit.getLength());
         r.setHeight(unit.getHeight());
+        r.setFanType(unit.getFanType());
         r.setNumberOfFans(unit.getNumberOfFans());
         r.setFanDiameter(unit.getFanDiameter());
         r.setAirflowRate(unit.getAirflowRate());
@@ -362,6 +366,8 @@ public class UnitAppService {
         r.setLiquidLineDiameter(unit.getLiquidLineDiameter());
         r.setSuctionLineDiameter(unit.getSuctionLineDiameter());
         r.setGasTank(unit.getGasTank());
+        r.setWaterInletConnection(unit.getWaterInletConnection());
+        r.setWaterOutletConnection(unit.getWaterOutletConnection());
         r.setMinWaterInlet(unit.getMinWaterInlet());
         r.setMaxWaterInlet(unit.getMaxWaterInlet());
         r.setMinWaterOutlet(unit.getMinWaterOutlet());
@@ -371,6 +377,7 @@ public class UnitAppService {
 
         // per-mode (tech specs)
         r.setCapacity(ts.getCapacity());
+        r.setMaxCapacity(ts.getMaxCapacity() != null ? ts.getMaxCapacity() : 0.0);
         r.setCopErr(ts.getCopErr());
         r.setCondenserRequiredDuty(ts.getCondenserRequiredDuty());
         r.setQuietCondenserRequiredDuty(ts.getQuietCondenserRequiredDuty());
@@ -392,6 +399,7 @@ public class UnitAppService {
     // --- Update (chiller) ---
 
     @Transactional
+    @EvictsUnitCaches
     public void editUnit(Long id, ChillerWrapperDTO dto) {
 
         Unit unit = unitJpaRepository.findById(id)
@@ -424,6 +432,7 @@ public class UnitAppService {
     // --- Heat pump: shell (model + common tech), created without modes ---
 
     @Transactional
+    @EvictsUnitCaches
     public Long addHeatPump(HeatPumpModelWrapperDTO dto) {
 
         HeatPumpDTO hp = dto.getHeatPumpDto();
@@ -445,6 +454,7 @@ public class UnitAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void uploadAssets(Long unitId, AssetUploadDTO dto) {
 
         Unit unit = unitJpaRepository.findById(unitId)
@@ -468,6 +478,7 @@ public class UnitAppService {
     // --- Heat pump: attach one mode's details to an existing heat pump ---
 
     @Transactional
+    @EvictsUnitCaches
     public void addHeatPumpDetails(HeatPumpDetailsWrapperDTO dto) {
 
         Unit unit = unitJpaRepository.findById(dto.getHeatPumpId())
@@ -543,6 +554,7 @@ public class UnitAppService {
         r.setWidth(unit.getWidth());
         r.setLength(unit.getLength());
         r.setHeight(unit.getHeight());
+        r.setFanType(unit.getFanType());
         r.setNumberOfFans(unit.getNumberOfFans());
         r.setFanDiameter(unit.getFanDiameter());
         r.setAirflowRate(unit.getAirflowRate());
@@ -550,6 +562,8 @@ public class UnitAppService {
         r.setLiquidLineDiameter(unit.getLiquidLineDiameter());
         r.setSuctionLineDiameter(unit.getSuctionLineDiameter());
         r.setGasTank(unit.getGasTank());
+        r.setWaterInletConnection(unit.getWaterInletConnection());
+        r.setWaterOutletConnection(unit.getWaterOutletConnection());
 
         List<HeatPumpModeDTO> modes = new ArrayList<>();
         if (unit.getUnitDetails() != null) {
@@ -560,6 +574,7 @@ public class UnitAppService {
                 HeatPumpModeDTO m = new HeatPumpModeDTO();
                 m.setMod(d.getMod().name());
                 m.setCapacity(ts.getCapacity());
+                m.setMaxCapacity(ts.getMaxCapacity() != null ? ts.getMaxCapacity() : 0.0);
                 m.setCopErr(ts.getCopErr());
                 m.setCondenserRequiredDuty(ts.getCondenserRequiredDuty());
                 m.setQuietCondenserRequiredDuty(ts.getQuietCondenserRequiredDuty());
@@ -588,6 +603,7 @@ public class UnitAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void editHeatPump(Long id, HeatPumpModelWrapperDTO dto) {
 
         Unit unit = unitJpaRepository.findById(id)
@@ -610,6 +626,7 @@ public class UnitAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void editHeatPumpDetails(HeatPumpDetailsWrapperDTO dto) {
 
         Unit unit = unitJpaRepository.findById(dto.getHeatPumpId())
@@ -644,6 +661,7 @@ public class UnitAppService {
         unit.setWidth(d.getWidth());
         unit.setLength(d.getLength());
         unit.setHeight(d.getHeight());
+        unit.setFanType(d.getFanType());
         unit.setNumberOfFans(d.getNumberOfFans());
         unit.setFanDiameter(d.getFanDiameter());
         unit.setAirflowRate(d.getAirflowRate());
@@ -651,6 +669,8 @@ public class UnitAppService {
         unit.setLiquidLineDiameter(d.getLiquidLineDiameter());
         unit.setSuctionLineDiameter(d.getSuctionLineDiameter());
         unit.setGasTank(d.getGasTank());
+        unit.setWaterInletConnection(d.getWaterInletConnection());
+        unit.setWaterOutletConnection(d.getWaterOutletConnection());
         unit.setMinWaterInlet(d.getMinWaterInlet());
         unit.setMaxWaterInlet(d.getMaxWaterInlet());
         unit.setMinWaterOutlet(d.getMinWaterOutlet());
@@ -662,6 +682,7 @@ public class UnitAppService {
     // Per-mode attributes + the component spec points selected for that mode.
     void applyModeSpecs(TechSpecs ts, UnitTechSpecsDTO d) {
         ts.setCapacity(d.getCapacity());
+        ts.setMaxCapacity(d.getMaxCapacity());
         ts.setCopErr(d.getCopErr());
         ts.setCondenserRequiredDuty(d.getCondenserRequiredDuty());
         ts.setQuietCondenserRequiredDuty(d.getQuietCondenserRequiredDuty());
@@ -697,6 +718,7 @@ public class UnitAppService {
         unit.setWidth(d.getWidth());
         unit.setLength(d.getLength());
         unit.setHeight(d.getHeight());
+        unit.setFanType(d.getFanType());
         unit.setNumberOfFans(d.getNumberOfFans());
         unit.setFanDiameter(d.getFanDiameter());
         unit.setAirflowRate(d.getAirflowRate());
@@ -704,6 +726,8 @@ public class UnitAppService {
         unit.setLiquidLineDiameter(d.getLiquidLineDiameter());
         unit.setSuctionLineDiameter(d.getSuctionLineDiameter());
         unit.setGasTank(d.getGasTank());
+        unit.setWaterInletConnection(d.getWaterInletConnection());
+        unit.setWaterOutletConnection(d.getWaterOutletConnection());
         unit.setMinWaterInlet(d.getMinWaterInlet());
         unit.setMaxWaterInlet(d.getMaxWaterInlet());
         unit.setMinWaterOutlet(d.getMinWaterOutlet());
@@ -714,6 +738,7 @@ public class UnitAppService {
 
     void applyModeSpecs(TechSpecs ts, UnitModeSpecsDTO d) {
         ts.setCapacity(d.getCapacity());
+        ts.setMaxCapacity(d.getMaxCapacity());
         ts.setCopErr(d.getCopErr());
         ts.setCondenserRequiredDuty(d.getCondenserRequiredDuty());
         ts.setQuietCondenserRequiredDuty(d.getQuietCondenserRequiredDuty());
@@ -738,6 +763,7 @@ public class UnitAppService {
     // --- Asset management ---
 
     @Transactional
+    @EvictsUnitCaches
     public void deleteAsset(Long assetId) {
         UnitAsset asset = unitAssetRepository.findById(assetId)
                 .orElseThrow(() -> new RuntimeException("Asset not found: " + assetId));
@@ -753,6 +779,7 @@ public class UnitAppService {
     }
 
     @Transactional
+    @EvictsUnitCaches
     public void setPrimaryAsset(Long assetId) {
         UnitAsset target = unitAssetRepository.findById(assetId)
                 .orElseThrow(() -> new RuntimeException("Asset not found: " + assetId));
@@ -773,6 +800,7 @@ public class UnitAppService {
     // Soft-delete a unit: kept in the DB (saved-units / projects still reference it),
     // hidden from all listings, and recorded in the audit log.
     @Transactional
+    @EvictsUnitCaches
     public void deleteUnit(Long id, String adminEmail) {
         Unit unit = unitJpaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Unit not found: " + id));

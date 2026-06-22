@@ -1,5 +1,6 @@
 package org.offitec.osp.application.report;
 
+import org.offitec.osp.application.service.GlycolCorrection;
 import org.offitec.osp.application.service.UnitCalculationEngine;
 import org.offitec.osp.domain.entity.*;
 import org.offitec.osp.domain.enums.Mod;
@@ -23,8 +24,8 @@ import java.util.Locale;
  *   - Circuit qty               = compressor qty
  *   - Water pressure            = 1.5 bar     (constant)
  *   - Pressure drop             = 50 kPa      (constant)
- *   - MRA                       = 480 A       (constant)
- *   - LRA                       = 135.3 A     (constant)
+ *   - MOC                       = compressor MOC * compressor qty
+ *   - LRA                       = compressor LRA
  *   - Fan type / pipe connections = null for now ("-")
  */
 @Component
@@ -36,8 +37,6 @@ public class ReportDataAssembler {
     // Hardcoded constants (no DB field yet).
     private static final double WATER_PRESSURE_BAR = 1.5;
     private static final double PRESSURE_DROP_KPA = 50.0;
-    private static final double MRA_A = 480.0;
-    private static final double LRA_A = 135.3;
 
     // Fallback working-envelope bounds when a unit has none configured yet.
     private static final double DEFAULT_MIN_OUTLET = -5, DEFAULT_MAX_OUTLET = 25;
@@ -54,7 +53,8 @@ public class ReportDataAssembler {
 
     public UnitReportModel assemble(Unit unit, Mod mod,
                                     double ambient, double evapIn, double evapOut,
-                                    Project project, User user) {
+                                    Project project, User user,
+                                    String glycolType, Integer glycolPercentage) {
 
         UnitDetails details = findDetails(unit, mod);
         TechSpecs ts = details != null ? details.getTechSpecs() : null;
@@ -65,30 +65,36 @@ public class ReportDataAssembler {
 
         UnitCalculationEngine.Result design = engine.compute(cspecs, unit.getCompressorQty(), ambient, evapOut);
 
-        // The "Unit Specifications" block uses the unit's STORED technical specs (a property
-        // of the unit), not values computed from this calculation. Capacity and EER/COP are
-        // stored directly; input power is derived (power = capacity / COP). Fall back to the
-        // computed result only when a stored spec is missing (0).
-        double specCapacityKw = ts.getCapacity() > 0 ? ts.getCapacity() : design.capacityKw();
-        double specCop = ts.getCopErr() > 0 ? ts.getCopErr() : design.copEer();
-        double specPowerKw = specCop > 0 ? specCapacityKw / specCop : design.powerKw();
+        // A selected glycol mixture scales capacity, power and pressure drop.
+        GlycolCorrection.Factors gf = GlycolCorrection.lookup(glycolType, glycolPercentage);
 
-        // Flow rate is derived from the rated cooling capacity (the value shown in Unit
-        // Specifications): capacity(kW) * 860 / 5000, so the two stay consistent.
-        double flowRate = specCapacityKw * 860.0 / 5000.0;
+        // The "Output" block shows the values computed from THIS calculation (the entered
+        // operating conditions), not the unit's stored/default specs.
+        double outCapacityKw = design.capacityKw() * gf.capacity();
+        double outPowerKw = design.powerKw() * gf.power();
+        double outCop = outPowerKw > 0 ? outCapacityKw / outPowerKw : design.copEer();
+
+        // Flow rate is derived from the calculated cooling capacity (the value shown in the
+        // Output table): capacity(kW) * 860 / 5000, so the two stay consistent.
+        double flowRate = outCapacityKw * 860.0 / 5000.0;
         boolean cooling = mod == Mod.COOLING;
 
         // --- Full load cooling table across the standard ambient range ---
         List<UnitReportModel.FullLoadRow> fullLoad = new ArrayList<>();
         for (double a : FULL_LOAD_AMBIENTS) {
             UnitCalculationEngine.Result r = engine.compute(cspecs, unit.getCompressorQty(), a, evapOut);
+            double cap = r.capacityKw() * gf.capacity();
+            double pow = r.powerKw() * gf.power();
             fullLoad.add(UnitReportModel.FullLoadRow.builder()
                     .ambient(fmt1(a))
-                    .capacity(fmt0(r.capacityKw()))
-                    .power(fmt1(r.powerKw()))
-                    .eerCop(fmt2(r.copEer()))
+                    .capacity(fmt4(cap))
+                    .power(fmt4(pow))
+                    .eerCop(fmt4(pow > 0 ? cap / pow : r.copEer()))
                     .build());
         }
+
+        // Pressure drop (base 50 kPa) scaled by the glycol factor.
+        double pressureDropKpa = PRESSURE_DROP_KPA * gf.pressureDrop();
 
         // --- Working envelope bounds (fall back to sensible defaults if unset) ---
         double minOut = unit.getMinWaterOutlet();
@@ -97,6 +103,12 @@ public class ReportDataAssembler {
         double minAmb = unit.getMinAmbient();
         double maxAmb = unit.getMaxAmbient();
         if (maxAmb <= minAmb) { minAmb = DEFAULT_MIN_AMBIENT; maxAmb = DEFAULT_MAX_AMBIENT; }
+
+        // Electrical data from the compressor: MOC is per-compressor * compressor qty; LRA as-is.
+        Compressor compressor = cspecs.getCompressor();
+        double mocPer = compressor != null && compressor.getMoc() != null ? compressor.getMoc() : 0.0;
+        double lraVal = compressor != null && compressor.getLra() != null ? compressor.getLra() : 0.0;
+        double totalMoc = mocPer * Math.max(unit.getCompressorQty(), 1);
 
         return UnitReportModel.builder()
                 // Project information (project values win; otherwise fall back to the user's account)
@@ -115,12 +127,12 @@ public class ReportDataAssembler {
                 .ambient(fmt1(ambient))
                 .waterInlet(fmt1(evapIn))
                 .waterOutlet(fmt1(evapOut))
-                // Unit specifications (from the unit's stored technical specs)
-                .coolingCapacityKcalh(fmtThousands(specCapacityKw * 860.0))
-                .coolingCapacityKw(fmt1(specCapacityKw))
-                .inputPowerKw(fmt1(specPowerKw))
+                // Outputs (values computed from the entered operating conditions)
+                .coolingCapacityKcalh(fmtThousands(outCapacityKw * 860.0))
+                .coolingCapacityKw(fmt4(outCapacityKw))
+                .inputPowerKw(fmt4(outPowerKw))
                 .eerCopLabel(cooling ? "EER" : "COP")
-                .eerCopValue(fmt2(specCop))
+                .eerCopValue(fmt4(outCop))
                 .fullLoad(fullLoad)
                 // Technical specifications
                 .refrigerantCode(unit.getRefrigerant() != null ? nz(unit.getRefrigerant().getCode()) : "-")
@@ -131,23 +143,24 @@ public class ReportDataAssembler {
                 .condenserType(condenserType(ts))
                 // Hydraulic kit
                 .evaporatorType(evaporatorType(ts))
-                .flowRate(fmt2(flowRate))
+                .flowRate(fmt4(flowRate))
                 .waterPressure(fmt1(WATER_PRESSURE_BAR))
-                .pressureDrop(fmt0(PRESSURE_DROP_KPA))
+                .pressureDrop(fmt4(pressureDropKpa))
                 // Fans
-                .fanType("-")
+                .fanType(dash(unit.getFanType()))
                 .fanQty(String.valueOf(unit.getNumberOfFans()))
-                .airFlowRate(fmtThousands(unit.getAirflowRate()))
-                // Pipe connection (null for now)
-                .waterInletConnection("-")
-                .waterOutletConnection("-")
-                // Electrical
-                .mra(fmt0(MRA_A))
-                .lra(fmt1(LRA_A))
-                // Dimensions are stored in metres and shown with 2 decimals (e.g. 3.00 m).
-                .length(fmt2(unit.getLength()))
-                .width(fmt2(unit.getWidth()))
-                .height(fmt2(unit.getHeight()))
+                // Total air flow = fan quantity * per-fan air flow rate.
+                .airFlowRate(fmtThousands(Math.max(unit.getNumberOfFans(), 1) * unit.getAirflowRate()))
+                // Pipe connections (stored on the unit)
+                .waterInletConnection(dash(unit.getWaterInletConnection()))
+                .waterOutletConnection(dash(unit.getWaterOutletConnection()))
+                // Electrical (from the compressor)
+                .moc(fmt4(totalMoc))
+                .lra(fmt4(lraVal))
+                // Dimensions are stored in millimetres.
+                .length(fmt0(unit.getLength()))
+                .width(fmt0(unit.getWidth()))
+                .height(fmt0(unit.getHeight()))
                 // Chart raw data
                 .workingLimit(UnitReportModel.WorkingLimit.builder()
                         .minWaterOutlet(minOut).maxWaterOutlet(maxOut)
@@ -156,7 +169,7 @@ public class ReportDataAssembler {
                         .build())
                 .pressureCurve(UnitReportModel.PressureCurve.builder()
                         .designFlowRate(flowRate)
-                        .designPressureDrop(PRESSURE_DROP_KPA)
+                        .designPressureDrop(pressureDropKpa)
                         .build())
                 .build();
     }
@@ -217,6 +230,14 @@ public class ReportDataAssembler {
     private String fmt0(double v) { return String.format(Locale.US, "%.0f", v); }
     private String fmt1(double v) { return String.format(Locale.US, "%.1f", v); }
     private String fmt2(double v) { return String.format(Locale.US, "%.2f", v); }
+
+    // Up to 4 decimals, trailing zeros trimmed: 38.5 -> "38.5", 3.14159 -> "3.1416", 40 -> "40".
+    private String fmt4(double v) {
+        double r = Math.round(v * 10000.0) / 10000.0;
+        if (r == Math.rint(r) && !Double.isInfinite(r)) return String.format(Locale.US, "%.0f", r);
+        String s = String.format(Locale.US, "%.4f", r);
+        return s.replaceAll("0+$", "").replaceAll("\\.$", "");
+    }
     private String fmtThousands(double v) { return String.format(Locale.US, "%,.0f", v); }
 
     // The phone is stored as the country code + number without a leading "+"
@@ -228,6 +249,8 @@ public class ReportDataAssembler {
     }
 
     private String nz(String s) { return s == null ? "" : s; }
+    // Like nz but shows "-" for missing values (for report cells that always render a dash).
+    private String dash(String s) { return (s == null || s.isBlank()) ? "-" : s; }
     private String pick(String a, String b) {
         if (a != null && !a.isBlank()) return a;
         if (b != null && !b.isBlank()) return b;

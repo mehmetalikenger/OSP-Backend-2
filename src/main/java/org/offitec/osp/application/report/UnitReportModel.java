@@ -69,8 +69,8 @@ public class UnitReportModel {
     private final String waterOutletConnection;
 
     // --- Electrical data ---
-    private final String mra;                  // "480" A
-    private final String lra;                  // "135.3" A
+    private final String moc;                  // compressor MOC * compressor qty, in A
+    private final String lra;                  // compressor LRA, in A
 
     // --- Unit dimensions ---
     private final String length;               // m

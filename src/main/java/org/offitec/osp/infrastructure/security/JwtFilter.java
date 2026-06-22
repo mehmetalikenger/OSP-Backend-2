@@ -217,7 +217,10 @@ public class JwtFilter extends OncePerRequestFilter {
             (role != null && !role.trim().isEmpty()) ? java.util.Collections.singletonList(new org.springframework.security.core.authority.SimpleGrantedAuthority(role)) 
                          : java.util.Collections.emptyList();
 
-        Authentication authentication = UsernamePasswordAuthenticationToken.authenticated(email, rememberMe, authorities);
+        UsernamePasswordAuthenticationToken authentication = UsernamePasswordAuthenticationToken.authenticated(email, rememberMe, authorities);
+        // Stash the already-loaded user id so request-scoped lookups (e.g. the public
+        // unit endpoints' currentUserId) don't have to hit the DB again for it.
+        authentication.setDetails(dbUser.get().getId());
         context.setAuthentication(authentication);
 
         SecurityContextHolder.setContext(context);

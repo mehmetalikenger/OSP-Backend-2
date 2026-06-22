@@ -27,6 +27,14 @@ public class Compressor {
     @Column(nullable = false)
     private String model;
 
+    // Maximum Operating Current and Locked Rotor Amperage (A).
+    // Nullable so rows created before these columns existed (NULL) still hydrate.
+    @Column(name = "moc")
+    private Double moc;
+
+    @Column(name = "lra")
+    private Double lra;
+
     @Column(nullable = false)
     @org.hibernate.annotations.ColumnDefault("false")
     private boolean deleted = false;

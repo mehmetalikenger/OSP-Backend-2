@@ -129,9 +129,9 @@
     <div class="chart" th:utext="${workingLimitSvg}"></div>
 </div>
 
-<!-- ===== Unit Specifications ===== -->
+<!-- ===== Outputs ===== -->
 <div class="avoid-break">
-    <div class="section-title">Unit Specifications</div>
+    <div class="section-title">Outputs</div>
     <table class="data">
         <tr><td class="label">Cooling Capacity</td><td class="unit">kcal/h</td><td class="value" th:text="${m.coolingCapacityKcalh}"></td></tr>
         <tr><td class="label">Cooling Capacity</td><td class="unit">kW</td><td class="value" th:text="${m.coolingCapacityKw}"></td></tr>
@@ -199,7 +199,7 @@
 <div class="avoid-break">
     <div class="section-title">Fans</div>
     <table class="data">
-        <tr><td class="label">Type</td><td class="unit">-</td><td class="value" th:text="${m.fanType}"></td></tr>
+        <tr><td class="label">Fan Type</td><td class="unit">-</td><td class="value" th:text="${m.fanType}"></td></tr>
         <tr><td class="label">Number of Fans</td><td class="unit">n</td><td class="value" th:text="${m.fanQty}"></td></tr>
         <tr><td class="label">Air Flow Rate</td><td class="unit">m³/h</td><td class="value" th:text="${m.airFlowRate}"></td></tr>
     </table>
@@ -218,7 +218,7 @@
 <div class="avoid-break">
     <div class="section-title">Electrical Data</div>
     <table class="data">
-        <tr><td class="label">MRA</td><td class="unit">A</td><td class="value" th:text="${m.mra}"></td></tr>
+        <tr><td class="label">MOC</td><td class="unit">A</td><td class="value" th:text="${m.moc}"></td></tr>
         <tr><td class="label">LRA</td><td class="unit">A</td><td class="value" th:text="${m.lra}"></td></tr>
     </table>
 </div>
@@ -227,9 +227,9 @@
 <div class="avoid-break">
     <div class="section-title">Unit Dimensions</div>
     <table class="data">
-        <tr><td class="label">Length</td><td class="unit">m</td><td class="value" th:text="${m.length}"></td></tr>
-        <tr><td class="label">Width</td><td class="unit">m</td><td class="value" th:text="${m.width}"></td></tr>
-        <tr><td class="label">Height</td><td class="unit">m</td><td class="value" th:text="${m.height}"></td></tr>
+        <tr><td class="label">Length</td><td class="unit">mm</td><td class="value" th:text="${m.length}"></td></tr>
+        <tr><td class="label">Width</td><td class="unit">mm</td><td class="value" th:text="${m.width}"></td></tr>
+        <tr><td class="label">Height</td><td class="unit">mm</td><td class="value" th:text="${m.height}"></td></tr>
     </table>
 </div>
 

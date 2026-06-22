@@ -20,6 +20,10 @@ public class TechSpecs {
 
     private double capacity;
 
+    // Nullable so rows created before this column existed (NULL) still hydrate.
+    @Column(name = "max_capacity")
+    private Double maxCapacity;
+
     @Column(name = "cop_err")
     private double copErr;
 

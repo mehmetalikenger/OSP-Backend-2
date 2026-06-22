@@ -32,11 +32,13 @@ public class UnitCalculationEngine {
                 specs.getPC6(), specs.getPC7(), specs.getPC8(), specs.getPC9(), specs.getPC10());
 
         int qty = Math.max(compressorQty, 1);
+        // The polynomials return power in WATTS; convert the totals to kW. COP/EER is a
+        // ratio of the two, so it's unit-independent and computed before the conversion.
         double totalQ = q * qty;
         double totalP = p * qty;
         double copEer = totalP > 0 ? totalQ / totalP : 0;
 
-        return new Result(totalQ, totalP, copEer);
+        return new Result(totalQ / 1000.0, totalP / 1000.0, copEer);
     }
 
     public double evalPolynomial(double s, double d,

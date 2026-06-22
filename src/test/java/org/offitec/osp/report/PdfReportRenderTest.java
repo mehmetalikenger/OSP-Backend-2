@@ -90,7 +90,7 @@ class PdfReportRenderTest {
                 .waterPressure("1.5").pressureDrop("50")
                 .fanType("-").fanQty("2").airFlowRate("40,000")
                 .waterInletConnection("-").waterOutletConnection("-")
-                .mra("480").lra("135.3")
+                .moc("480").lra("135.3")
                 .length("3.00").width("1.20").height("2.30")
                 .workingLimit(UnitReportModel.WorkingLimit.builder()
                         .minWaterOutlet(0).maxWaterOutlet(25)

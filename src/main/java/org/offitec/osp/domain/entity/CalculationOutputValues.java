@@ -38,4 +38,9 @@ public class CalculationOutputValues {
 
     @Column(name = "operating_frequency")
     private double operatingFrequency;
+
+    // Pressure drop (kPa): base 50 scaled by the glycol correction. Nullable so rows
+    // created before this column existed (NULL) still hydrate.
+    @Column(name = "pressure_drop")
+    private Double pressureDrop;
 }

@@ -52,7 +52,8 @@ public class ReportAppService {
         User user = currentUser();
 
         UnitReportModel model = assembler.assemble(
-                unit, mod, dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(), null, user);
+                unit, mod, dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(), null, user,
+                dto.getGlycolType(), dto.getGlycolPercentage());
 
         return pdfReportService.render(model);
     }
@@ -63,8 +64,10 @@ public class ReportAppService {
      * runs in the caller's transaction so the URL can be saved on the ProjectDetails row.
      * The project (when present) supplies the contact/address block printed on the report.
      */
-    public String renderAndStore(Unit unit, Mod mod, double ambient, double evapIn, double evapOut, Project project, User user) {
-        UnitReportModel model = assembler.assemble(unit, mod, ambient, evapIn, evapOut, project, user);
+    public String renderAndStore(Unit unit, Mod mod, double ambient, double evapIn, double evapOut, Project project, User user,
+                                 String glycolType, Integer glycolPercentage) {
+        UnitReportModel model = assembler.assemble(unit, mod, ambient, evapIn, evapOut, project, user,
+                glycolType, glycolPercentage);
         byte[] pdf = pdfReportService.render(model);
 
         String key = "unit-" + unit.getId() + "/" + java.util.UUID.randomUUID() + ".pdf";
