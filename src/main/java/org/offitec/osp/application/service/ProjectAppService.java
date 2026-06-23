@@ -145,10 +145,13 @@ public class ProjectAppService {
                 pressureDrop);    // pressureDrop (base 50 * glycol factor)
 
         // Adding to a project is the only flow that persists a report: render it,
-        // store it in R2, and keep the URL on the ProjectDetails row.
+        // store it in R2, and keep the URL on the ProjectDetails row. The chosen language
+        // drives the PDF and is stored so a later regeneration keeps the same language.
+        String language = dto.getLanguage() == null ? "en" : dto.getLanguage();
         String pdfUrl = reportAppService.renderAndStore(
                 unit, mod, dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(), project, project.getUser(),
-                dto.getGlycolType(), dto.getGlycolPercentage());
+                dto.getGlycolType(), dto.getGlycolPercentage(),
+                org.offitec.osp.application.report.ReportMessages.toLocale(language));
 
         ProjectDetails pd = new ProjectDetails();
         pd.setProject(project);
@@ -156,6 +159,7 @@ public class ProjectAppService {
         pd.setCustomCalculationValues(inputs);   // cascade ALL persists these
         pd.setCalculationOutputValues(outputs);
         pd.setMod(mod);                          // remembered so the report can be regenerated
+        pd.setLanguage(language);                // remembered so the report keeps its language
         pd.setPdfUrl(pdfUrl);
         projectDetailsRepository.save(pd);
 
@@ -217,11 +221,12 @@ public class ProjectAppService {
 
         Mod mod = d.getMod() == null ? Mod.COOLING : d.getMod();
         String oldUrl = d.getPdfUrl();
-        // Reuse the stored glycol selection so the regenerated report recalculates with the
-        // same correction the user originally chose.
+        // Reuse the stored glycol selection and language so the regenerated report recalculates
+        // with the same correction and renders in the same language the user originally chose.
         String newUrl = reportAppService.renderAndStore(
                 unit, mod, in.getAmbient(), in.getEvapIn(), in.getEvapOut(), project, project.getUser(),
-                in.getMixtureType(), in.getMixtureRatio());
+                in.getMixtureType(), in.getMixtureRatio(),
+                org.offitec.osp.application.report.ReportMessages.toLocale(d.getLanguage()));
         d.setPdfUrl(newUrl);
         projectDetailsRepository.save(d);
 

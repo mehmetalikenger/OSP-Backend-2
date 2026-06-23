@@ -3,6 +3,7 @@ package org.offitec.osp.application.report;
 import org.offitec.osp.application.service.GlycolCorrection;
 import org.offitec.osp.application.service.UnitCalculationEngine;
 import org.offitec.osp.domain.entity.*;
+import org.offitec.osp.domain.enums.AssetType;
 import org.offitec.osp.domain.enums.Mod;
 import org.offitec.osp.domain.enums.UnitCategory;
 import org.offitec.osp.domain.enums.UnitTypeEnum;
@@ -13,6 +14,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Builds the {@link UnitReportModel} for a unit + user-entered operating conditions.
@@ -42,19 +44,22 @@ public class ReportDataAssembler {
     private static final double DEFAULT_MIN_OUTLET = -5, DEFAULT_MAX_OUTLET = 25;
     private static final double DEFAULT_MIN_AMBIENT = -10, DEFAULT_MAX_AMBIENT = 48;
 
-    private static final DateTimeFormatter DATE_FMT =
-            DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy", Locale.ENGLISH);
-
     private final UnitCalculationEngine engine;
+    private final ReportMessages messages;
 
-    public ReportDataAssembler(UnitCalculationEngine engine) {
+    public ReportDataAssembler(UnitCalculationEngine engine, ReportMessages messages) {
         this.engine = engine;
+        this.messages = messages;
     }
 
     public UnitReportModel assemble(Unit unit, Mod mod,
                                     double ambient, double evapIn, double evapOut,
                                     Project project, User user,
-                                    String glycolType, Integer glycolPercentage) {
+                                    String glycolType, Integer glycolPercentage,
+                                    Locale locale) {
+
+        Map<String, String> t = messages.labels(locale);
+        DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy", locale);
 
         UnitDetails details = findDetails(unit, mod);
         TechSpecs ts = details != null ? details.getTechSpecs() : null;
@@ -110,7 +115,29 @@ public class ReportDataAssembler {
         double lraVal = compressor != null && compressor.getLra() != null ? compressor.getLra() : 0.0;
         double totalMoc = mocPer * Math.max(unit.getCompressorQty(), 1);
 
+        // Unit imagery: the primary image is shown next to the Configuration block and the
+        // technical drawings are rendered at the end of the report (PdfReportService fetches
+        // each URL and embeds it as a data URI).
+        String primaryImageUrl = "";
+        List<String> drawingUrls = new ArrayList<>();
+        if (unit.getAssets() != null) {
+            String firstImage = null;
+            for (UnitAsset a : unit.getAssets()) {
+                if (a.getAssetType() == AssetType.IMAGE) {
+                    if (firstImage == null) firstImage = a.getUrl();
+                    if (a.isPrimary()) primaryImageUrl = a.getUrl();
+                } else if (a.getAssetType() == AssetType.DRAWING && a.getUrl() != null) {
+                    drawingUrls.add(a.getUrl());
+                }
+            }
+            // Fall back to any image when none is explicitly flagged primary.
+            if (primaryImageUrl.isEmpty() && firstImage != null) primaryImageUrl = firstImage;
+        }
+
         return UnitReportModel.builder()
+                .t(t)
+                .primaryImageUrl(primaryImageUrl)
+                .drawingUrls(drawingUrls)
                 // Project information (project values win; otherwise fall back to the user's account)
                 .projectName(project != null ? project.getName() : "")
                 .responsiblePerson(user != null ? nz(user.getUsername()) : "")
@@ -119,10 +146,10 @@ public class ReportDataAssembler {
                 .country(pick(project != null ? project.getCountry() : null, user != null ? user.getCountry() : null))
                 .city(pick(project != null ? project.getCity() : null, user != null ? user.getCity() : null))
                 .address(pick(project != null ? project.getAddress() : null, user != null ? user.getAddress() : null))
-                .printedDate(LocalDate.now().format(DATE_FMT))
+                .printedDate(LocalDate.now().format(dateFmt))
                 // Configuration
                 .model(nz(unit.getModel()))
-                .category(categoryLabel(unit.getCategory(), unit.getUnitType()))
+                .category(categoryLabel(unit.getCategory(), unit.getUnitType(), t))
                 // Inputs
                 .ambient(fmt1(ambient))
                 .waterInlet(fmt1(evapIn))
@@ -205,12 +232,12 @@ public class ReportDataAssembler {
         return "-";
     }
 
-    private String categoryLabel(UnitCategory category, UnitTypeEnum type) {
+    private String categoryLabel(UnitCategory category, UnitTypeEnum type, Map<String, String> t) {
         boolean air = type == UnitTypeEnum.AW;
         if (category == UnitCategory.CHILLER) {
-            return air ? "Air Cooled Chiller" : "Water Cooled Chiller";
+            return air ? t.get("catAirCooledChiller") : t.get("catWaterCooledChiller");
         }
-        return air ? "Air to Water Heat Pump" : "Water to Water Heat Pump";
+        return air ? t.get("catAirToWaterHeatPump") : t.get("catWaterToWaterHeatPump");
     }
 
     // --- formatting helpers ---

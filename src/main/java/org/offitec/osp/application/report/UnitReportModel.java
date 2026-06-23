@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Flat, presentation-ready view model for the unit selection PDF report.
@@ -15,6 +16,13 @@ import java.util.List;
 @Getter
 @Builder
 public class UnitReportModel {
+
+    // --- Localized labels (key -> translated text) used by the template ('t' for brevity). ---
+    private final Map<String, String> t;
+
+    // --- Unit imagery embedded in the report ---
+    private final String primaryImageUrl;       // shown next to the Configuration section ("" when none)
+    private final List<String> drawingUrls;     // technical drawings, rendered at the end (empty when none)
 
     // --- Project information block ---
     private final String projectName;

@@ -26,4 +26,8 @@ public class AddToProjectDTO {
     // Optional glycol mixture correction (see GlycolCorrection).
     private String glycolType;
     private Integer glycolPercentage;
+
+    // Language of the stored report PDF: "en" (default) or "de". Persisted on the
+    // ProjectDetails row so the report regenerates in the same language later.
+    private String language = "en";
 }

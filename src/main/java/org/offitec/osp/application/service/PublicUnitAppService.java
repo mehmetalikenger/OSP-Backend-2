@@ -243,6 +243,10 @@ public class PublicUnitAppService {
 
         double pressureDrop = 50.0 * gf.pressureDrop();
 
+        // Flow rate derived from the cooling capacity, matching the report assembler so the
+        // calculation page and the PDF show the same value: capacity(kW) * 860 / 5000 (m³/h).
+        double flowRate = totalQ * 860.0 / 5000.0;
+
         CustomCalculationValues customVals = new CustomCalculationValues(
                 null,
                 dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(), dto.getCondIn(), dto.getCondOut(),
@@ -264,7 +268,8 @@ public class PublicUnitAppService {
         );
         outputVals = calcOutputValsRepository.save(outputVals);
 
-        return new CalculationResultDTO(totalQ, totalP, copEer, customVals.getId(), outputVals.getId());
+        return new CalculationResultDTO(totalQ, totalP, copEer, flowRate, pressureDrop,
+                customVals.getId(), outputVals.getId());
     }
 
     private double evalPolynomial(double S, double D,

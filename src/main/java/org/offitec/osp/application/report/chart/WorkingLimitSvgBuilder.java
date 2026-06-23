@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Renders the Working Limit graph as an SVG string:
@@ -18,7 +19,7 @@ public class WorkingLimitSvgBuilder {
     private static final int W = 520, H = 320;
     private static final int LEFT = 55, RIGHT = 20, TOP = 15, BOTTOM = 45;
 
-    public String build(UnitReportModel.WorkingLimit wl) {
+    public String build(UnitReportModel.WorkingLimit wl, Map<String, String> labels) {
         double plotL = LEFT, plotR = W - RIGHT, plotT = TOP, plotB = H - BOTTOM;
 
         // Domains padded to include both the safe rectangle and the operating point.
@@ -68,11 +69,11 @@ public class WorkingLimitSvgBuilder {
         s.append(labelBox(px + 6, py - 10, ptLabel));
 
         // Axis titles
-        s.append(text((plotL + plotR) / 2, H - 8, "middle", "Water Outlet Temperature [°C]"));
+        s.append(text((plotL + plotR) / 2, H - 8, "middle", labels.get("axisWaterOutletTemp")));
         s.append(String.format(Locale.US,
                 "<text x='14' y='%.1f' text-anchor='middle' transform='rotate(-90 14 %.1f)' "
-              + "font-family='Helvetica,Arial,sans-serif' font-size='10' fill='#333'>Ambient Temperature [°C]</text>",
-                (plotT + plotB) / 2, (plotT + plotB) / 2));
+              + "font-family='Helvetica,Arial,sans-serif' font-size='10' fill='#333'>%s</text>",
+                (plotT + plotB) / 2, (plotT + plotB) / 2, esc(labels.get("axisAmbientTemp"))));
 
         s.append("</svg>");
         return s.toString();

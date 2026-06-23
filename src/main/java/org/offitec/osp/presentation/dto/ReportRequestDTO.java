@@ -20,4 +20,8 @@ public class ReportRequestDTO {
     // Optional glycol mixture correction (see GlycolCorrection).
     private String glycolType;
     private Integer glycolPercentage;
+
+    // Report language: "en" (default) or "de". Drives all labels, the localized charts,
+    // category name, and date format on the generated PDF.
+    private String language = "en";
 }

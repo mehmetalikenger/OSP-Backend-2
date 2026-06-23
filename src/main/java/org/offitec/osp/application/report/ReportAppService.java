@@ -53,7 +53,7 @@ public class ReportAppService {
 
         UnitReportModel model = assembler.assemble(
                 unit, mod, dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(), null, user,
-                dto.getGlycolType(), dto.getGlycolPercentage());
+                dto.getGlycolType(), dto.getGlycolPercentage(), ReportMessages.toLocale(dto.getLanguage()));
 
         return pdfReportService.render(model);
     }
@@ -65,9 +65,9 @@ public class ReportAppService {
      * The project (when present) supplies the contact/address block printed on the report.
      */
     public String renderAndStore(Unit unit, Mod mod, double ambient, double evapIn, double evapOut, Project project, User user,
-                                 String glycolType, Integer glycolPercentage) {
+                                 String glycolType, Integer glycolPercentage, java.util.Locale locale) {
         UnitReportModel model = assembler.assemble(unit, mod, ambient, evapIn, evapOut, project, user,
-                glycolType, glycolPercentage);
+                glycolType, glycolPercentage, locale);
         byte[] pdf = pdfReportService.render(model);
 
         String key = "unit-" + unit.getId() + "/" + java.util.UUID.randomUUID() + ".pdf";

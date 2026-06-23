@@ -42,5 +42,10 @@ public class ProjectDetails {
     @Column(name = "mod")
     private Mod mod;
 
+    // Language the stored report PDF was rendered in ("en"/"de"). Remembered so the
+    // report regenerates in the same language when the project's info changes.
+    @Column(name = "language")
+    private String language;
+
     private String pdfUrl;
 }

@@ -8,11 +8,11 @@
             margin: 96px 38px 58px 38px;
             @top-center { content: element(pageHeader); }
             @bottom-left {
-                content: "OSP Unit Selection Report";
+                content: "[[${m.t.reportFooter}]]";
                 font-family: Helvetica, Arial, sans-serif; font-size: 8px; color: #888;
             }
             @bottom-right {
-                content: "Page " counter(page) " / " counter(pages);
+                content: "[[${m.t.page}]] " counter(page) " / " counter(pages);
                 font-family: Helvetica, Arial, sans-serif; font-size: 8px; color: #888;
             }
         }
@@ -57,6 +57,11 @@
             padding: 5px 8px; margin-top: 16px;
         }
 
+        /* Configuration block: details on the left, the unit's primary image on the right */
+        table.config { width: 100%; border-collapse: collapse; }
+        table.config td { vertical-align: top; }
+        table.config td.config-img-cell { width: 200px; text-align: right; }
+        img.config-image { max-width: 190px; max-height: 140px; }
         .config-line { margin: 2px 0; }
         .config-line .k { font-weight: bold; display: inline-block; width: 90px; }
 
@@ -76,6 +81,10 @@
         .chart { text-align: center; margin: 6px 0 4px 0; page-break-inside: avoid; }
         .note { font-size: 8.5px; color: #666; margin: 2px 0; }
         .avoid-break { page-break-inside: avoid; }
+
+        /* Technical drawings (end of report) */
+        .drawing { text-align: center; margin: 8px 0; page-break-inside: avoid; }
+        img.drawing-image { max-width: 100%; max-height: 360px; }
     </style>
 </head>
 <body>
@@ -93,49 +102,58 @@
 
 <!-- ===== Project Information ===== -->
 <div class="avoid-break">
-    <div class="block-title">Project Information</div>
+    <div class="block-title" th:text="${m.t.projectInformation}"></div>
     <table class="kv">
-        <tr><td class="k">Project Name</td><td class="v" th:text="${m.projectName}"></td></tr>
-        <tr><td class="k">Name</td><td class="v" th:text="${m.responsiblePerson}"></td></tr>
-        <tr><td class="k">Email Address</td><td class="v" th:text="${m.email}"></td></tr>
-        <tr><td class="k">Phone Number</td><td class="v" th:text="${m.phone}"></td></tr>
-        <tr><td class="k">Country</td><td class="v" th:text="${m.country}"></td></tr>
-        <tr><td class="k">City</td><td class="v" th:text="${m.city}"></td></tr>
-        <tr><td class="k">Address</td><td class="v" th:text="${m.address}"></td></tr>
-        <tr><td class="k">Date</td><td class="v" th:text="${m.printedDate}"></td></tr>
+        <tr><td class="k" th:text="${m.t.projectName}"></td><td class="v" th:text="${m.projectName}"></td></tr>
+        <tr><td class="k" th:text="${m.t.nameLabel}"></td><td class="v" th:text="${m.responsiblePerson}"></td></tr>
+        <tr><td class="k" th:text="${m.t.emailAddress}"></td><td class="v" th:text="${m.email}"></td></tr>
+        <tr><td class="k" th:text="${m.t.phoneNumber}"></td><td class="v" th:text="${m.phone}"></td></tr>
+        <tr><td class="k" th:text="${m.t.country}"></td><td class="v" th:text="${m.country}"></td></tr>
+        <tr><td class="k" th:text="${m.t.city}"></td><td class="v" th:text="${m.city}"></td></tr>
+        <tr><td class="k" th:text="${m.t.address}"></td><td class="v" th:text="${m.address}"></td></tr>
+        <tr><td class="k" th:text="${m.t.date}"></td><td class="v" th:text="${m.printedDate}"></td></tr>
     </table>
 </div>
 
-<!-- ===== Configuration ===== -->
+<!-- ===== Configuration (with the unit's primary image alongside) ===== -->
 <div class="avoid-break">
-    <div class="section-title">Configuration</div>
-    <div class="config-line"><span class="k">Model</span><span th:text="${m.model}"></span></div>
-    <div class="config-line"><span class="k">Category</span><span th:text="${m.category}"></span></div>
+    <div class="section-title" th:text="${m.t.configuration}"></div>
+    <table class="config">
+        <tr>
+            <td>
+                <div class="config-line"><span class="k" th:text="${m.t.model}"></span><span th:text="${m.model}"></span></div>
+                <div class="config-line"><span class="k" th:text="${m.t.category}"></span><span th:text="${m.category}"></span></div>
+            </td>
+            <td class="config-img-cell">
+                <img th:if="${primaryImage}" class="config-image" th:src="${primaryImage}" alt=""/>
+            </td>
+        </tr>
+    </table>
 </div>
 
 <!-- ===== Inputs (Design) ===== -->
 <div class="avoid-break">
-    <div class="section-title">Inputs</div>
+    <div class="section-title" th:text="${m.t.inputs}"></div>
     <table class="data">
-        <tr><td class="label">Ambient Temperature</td><td class="unit">°C</td><td class="value" th:text="${m.ambient}"></td></tr>
-        <tr><td class="label">Water Inlet Temperature</td><td class="unit">°C</td><td class="value" th:text="${m.waterInlet}"></td></tr>
-        <tr><td class="label">Water Outlet Temperature</td><td class="unit">°C</td><td class="value" th:text="${m.waterOutlet}"></td></tr>
+        <tr><td class="label" th:text="${m.t.ambientTemperature}"></td><td class="unit">°C</td><td class="value" th:text="${m.ambient}"></td></tr>
+        <tr><td class="label" th:text="${m.t.waterInletTemperature}"></td><td class="unit">°C</td><td class="value" th:text="${m.waterInlet}"></td></tr>
+        <tr><td class="label" th:text="${m.t.waterOutletTemperature}"></td><td class="unit">°C</td><td class="value" th:text="${m.waterOutlet}"></td></tr>
     </table>
 </div>
 
 <!-- ===== Working Limit Graph ===== -->
 <div class="avoid-break">
-    <div class="section-title">Working Limit Graph</div>
+    <div class="section-title" th:text="${m.t.workingLimitGraph}"></div>
     <div class="chart" th:utext="${workingLimitSvg}"></div>
 </div>
 
 <!-- ===== Outputs ===== -->
 <div class="avoid-break">
-    <div class="section-title">Outputs</div>
+    <div class="section-title" th:text="${m.t.outputs}"></div>
     <table class="data">
-        <tr><td class="label">Cooling Capacity</td><td class="unit">kcal/h</td><td class="value" th:text="${m.coolingCapacityKcalh}"></td></tr>
-        <tr><td class="label">Cooling Capacity</td><td class="unit">kW</td><td class="value" th:text="${m.coolingCapacityKw}"></td></tr>
-        <tr><td class="label">Input Power</td><td class="unit">kW</td><td class="value" th:text="${m.inputPowerKw}"></td></tr>
+        <tr><td class="label" th:text="${m.t.coolingCapacity}"></td><td class="unit">kcal/h</td><td class="value" th:text="${m.coolingCapacityKcalh}"></td></tr>
+        <tr><td class="label" th:text="${m.t.coolingCapacity}"></td><td class="unit">kW</td><td class="value" th:text="${m.coolingCapacityKw}"></td></tr>
+        <tr><td class="label" th:text="${m.t.inputPower}"></td><td class="unit">kW</td><td class="value" th:text="${m.inputPowerKw}"></td></tr>
         <tr><td class="label" th:text="${m.eerCopLabel}"></td><td class="unit">W/W</td><td class="value" th:text="${m.eerCopValue}"></td></tr>
     </table>
 </div>
@@ -143,18 +161,18 @@
 <!-- ===== Full Load Cooling ===== -->
 <!-- Wrapped so the header stays on the same page as its table. -->
 <div class="avoid-break">
-    <div class="section-title">Full Load Cooling</div>
+    <div class="section-title" th:text="${m.t.fullLoadCooling}"></div>
     <table class="fl">
         <tr class="ambients">
-            <th>Dry bulb ambient air temperature [°C]</th>
+            <th th:text="${m.t.dryBulbAmbientAir}"></th>
             <td th:each="r : ${m.fullLoad}" th:text="${r.ambient}"></td>
         </tr>
         <tr class="values">
-            <td class="rowhead">Capacity [kW]</td>
+            <td class="rowhead" th:text="${m.t.capacityKw}"></td>
             <td th:each="r : ${m.fullLoad}" th:text="${r.capacity}"></td>
         </tr>
         <tr class="values">
-            <td class="rowhead">Input Power [kW]</td>
+            <td class="rowhead" th:text="${m.t.inputPowerKw}"></td>
             <td th:each="r : ${m.fullLoad}" th:text="${r.power}"></td>
         </tr>
         <tr class="values">
@@ -162,75 +180,83 @@
             <td th:each="r : ${m.fullLoad}" th:text="${r.eerCop}"></td>
         </tr>
     </table>
-    <div class="note">The data in the table are calculated according to the entered Water Inlet/Outlet values.</div>
+    <div class="note" th:text="${m.t.fullLoadNote}"></div>
 </div>
 
 <!-- ===== Technical Specifications ===== -->
 <div class="avoid-break">
-    <div class="section-title">Unit Technical Specifications</div>
+    <div class="section-title" th:text="${m.t.unitTechnicalSpecifications}"></div>
     <table class="data">
-        <tr><td class="label">Refrigerant</td><td class="unit">-</td><td class="value" th:text="${m.refrigerantCode}"></td></tr>
-        <tr><td class="label">Compressor Model</td><td class="unit">-</td><td class="value" th:text="${m.compressorModel}"></td></tr>
-        <tr><td class="label">Compressor Brand</td><td class="unit">-</td><td class="value" th:text="${m.compressorBrand}"></td></tr>
-        <tr><td class="label">Compressor Quantity</td><td class="unit">n</td><td class="value" th:text="${m.compressorQty}"></td></tr>
-        <tr><td class="label">Circuit Quantity</td><td class="unit">n</td><td class="value" th:text="${m.circuitQty}"></td></tr>
-        <tr><td class="label">Condenser Type</td><td class="unit">Type</td><td class="value" th:text="${m.condenserType}"></td></tr>
+        <tr><td class="label" th:text="${m.t.refrigerant}"></td><td class="unit">-</td><td class="value" th:text="${m.refrigerantCode}"></td></tr>
+        <tr><td class="label" th:text="${m.t.compressorModel}"></td><td class="unit">-</td><td class="value" th:text="${m.compressorModel}"></td></tr>
+        <tr><td class="label" th:text="${m.t.compressorBrand}"></td><td class="unit">-</td><td class="value" th:text="${m.compressorBrand}"></td></tr>
+        <tr><td class="label" th:text="${m.t.compressorQuantity}"></td><td class="unit">n</td><td class="value" th:text="${m.compressorQty}"></td></tr>
+        <tr><td class="label" th:text="${m.t.circuitQuantity}"></td><td class="unit">n</td><td class="value" th:text="${m.circuitQty}"></td></tr>
+        <tr><td class="label" th:text="${m.t.condenserType}"></td><td class="unit">Type</td><td class="value" th:text="${m.condenserType}"></td></tr>
     </table>
 </div>
 
 <!-- ===== Hydraulic Kit ===== -->
 <div class="avoid-break">
-    <div class="section-title">Hydraulic Kit</div>
+    <div class="section-title" th:text="${m.t.hydraulicKit}"></div>
     <table class="data">
-        <tr><td class="label">Evaporator Type</td><td class="unit">Type</td><td class="value" th:text="${m.evaporatorType}"></td></tr>
-        <tr><td class="label">Flow Rate</td><td class="unit">m³/h</td><td class="value" th:text="${m.flowRate}"></td></tr>
-        <tr><td class="label">Water Pressure (System Need)</td><td class="unit">bar</td><td class="value" th:text="${m.waterPressure}"></td></tr>
-        <tr><td class="label">Pressure Drop</td><td class="unit">kPa</td><td class="value" th:text="${m.pressureDrop}"></td></tr>
+        <tr><td class="label" th:text="${m.t.evaporatorType}"></td><td class="unit">Type</td><td class="value" th:text="${m.evaporatorType}"></td></tr>
+        <tr><td class="label" th:text="${m.t.flowRate}"></td><td class="unit">m³/h</td><td class="value" th:text="${m.flowRate}"></td></tr>
+        <tr><td class="label" th:text="${m.t.waterPressureSystemNeed}"></td><td class="unit">bar</td><td class="value" th:text="${m.waterPressure}"></td></tr>
+        <tr><td class="label" th:text="${m.t.pressureDrop}"></td><td class="unit">kPa</td><td class="value" th:text="${m.pressureDrop}"></td></tr>
     </table>
 </div>
 
 <!-- ===== Pressure Drop / Flow Rate Graph ===== -->
 <div class="avoid-break">
-    <div class="section-title">Pressure Drop / Flow Rate Graph</div>
+    <div class="section-title" th:text="${m.t.pressureDropFlowRateGraph}"></div>
     <div class="chart" th:utext="${pressureDropSvg}"></div>
 </div>
 
 <!-- ===== Fans ===== -->
 <div class="avoid-break">
-    <div class="section-title">Fans</div>
+    <div class="section-title" th:text="${m.t.fans}"></div>
     <table class="data">
-        <tr><td class="label">Fan Type</td><td class="unit">-</td><td class="value" th:text="${m.fanType}"></td></tr>
-        <tr><td class="label">Number of Fans</td><td class="unit">n</td><td class="value" th:text="${m.fanQty}"></td></tr>
-        <tr><td class="label">Air Flow Rate</td><td class="unit">m³/h</td><td class="value" th:text="${m.airFlowRate}"></td></tr>
+        <tr><td class="label" th:text="${m.t.fanType}"></td><td class="unit">-</td><td class="value" th:text="${m.fanType}"></td></tr>
+        <tr><td class="label" th:text="${m.t.numberOfFans}"></td><td class="unit">n</td><td class="value" th:text="${m.fanQty}"></td></tr>
+        <tr><td class="label" th:text="${m.t.airFlowRate}"></td><td class="unit">m³/h</td><td class="value" th:text="${m.airFlowRate}"></td></tr>
     </table>
 </div>
 
 <!-- ===== Pipe Connection ===== -->
 <div class="avoid-break">
-    <div class="section-title">Pipe Connection</div>
+    <div class="section-title" th:text="${m.t.pipeConnection}"></div>
     <table class="data">
-        <tr><td class="label">Water Inlet Connection</td><td class="unit">inch</td><td class="value" th:text="${m.waterInletConnection}"></td></tr>
-        <tr><td class="label">Water Outlet Connection</td><td class="unit">inch</td><td class="value" th:text="${m.waterOutletConnection}"></td></tr>
+        <tr><td class="label" th:text="${m.t.waterInletConnection}"></td><td class="unit">inch</td><td class="value" th:text="${m.waterInletConnection}"></td></tr>
+        <tr><td class="label" th:text="${m.t.waterOutletConnection}"></td><td class="unit">inch</td><td class="value" th:text="${m.waterOutletConnection}"></td></tr>
     </table>
 </div>
 
 <!-- ===== Electrical Data ===== -->
 <div class="avoid-break">
-    <div class="section-title">Electrical Data</div>
+    <div class="section-title" th:text="${m.t.electricalData}"></div>
     <table class="data">
-        <tr><td class="label">MOC</td><td class="unit">A</td><td class="value" th:text="${m.moc}"></td></tr>
-        <tr><td class="label">LRA</td><td class="unit">A</td><td class="value" th:text="${m.lra}"></td></tr>
+        <tr><td class="label" th:text="${m.t.moc}"></td><td class="unit">A</td><td class="value" th:text="${m.moc}"></td></tr>
+        <tr><td class="label" th:text="${m.t.lra}"></td><td class="unit">A</td><td class="value" th:text="${m.lra}"></td></tr>
     </table>
 </div>
 
 <!-- ===== Unit Dimensions ===== -->
 <div class="avoid-break">
-    <div class="section-title">Unit Dimensions</div>
+    <div class="section-title" th:text="${m.t.unitDimensions}"></div>
     <table class="data">
-        <tr><td class="label">Length</td><td class="unit">mm</td><td class="value" th:text="${m.length}"></td></tr>
-        <tr><td class="label">Width</td><td class="unit">mm</td><td class="value" th:text="${m.width}"></td></tr>
-        <tr><td class="label">Height</td><td class="unit">mm</td><td class="value" th:text="${m.height}"></td></tr>
+        <tr><td class="label" th:text="${m.t.length}"></td><td class="unit">mm</td><td class="value" th:text="${m.length}"></td></tr>
+        <tr><td class="label" th:text="${m.t.width}"></td><td class="unit">mm</td><td class="value" th:text="${m.width}"></td></tr>
+        <tr><td class="label" th:text="${m.t.height}"></td><td class="unit">mm</td><td class="value" th:text="${m.height}"></td></tr>
     </table>
+</div>
+
+<!-- ===== Technical Drawings (end of report) ===== -->
+<div th:if="${not #lists.isEmpty(drawings)}">
+    <div class="section-title" th:text="${m.t.technicalDrawings}"></div>
+    <div class="drawing" th:each="d : ${drawings}">
+        <img class="drawing-image" th:src="${d}" alt=""/>
+    </div>
 </div>
 
 </body>

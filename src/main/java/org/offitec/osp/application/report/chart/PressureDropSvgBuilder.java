@@ -4,6 +4,7 @@ import org.offitec.osp.application.report.UnitReportModel;
 import org.springframework.stereotype.Component;
 
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Renders the Pressure Drop / Flow Rate graph as an SVG string.
@@ -16,7 +17,7 @@ public class PressureDropSvgBuilder {
     private static final int W = 520, H = 300;
     private static final int LEFT = 55, RIGHT = 20, TOP = 15, BOTTOM = 45;
 
-    public String build(UnitReportModel.PressureCurve pc) {
+    public String build(UnitReportModel.PressureCurve pc, Map<String, String> labels) {
         double qd = pc.getDesignFlowRate();
         double pdd = pc.getDesignPressureDrop();
         if (qd <= 0) qd = 1;
@@ -62,11 +63,11 @@ public class PressureDropSvgBuilder {
         s.append(labelBox(dpx + 6, dpy - 6,
                 String.format(Locale.US, "%.2f m³/h; %.0f kPa", qd, pdd)));
 
-        s.append(text((plotL + plotR) / 2, H - 8, "middle", "Water Flow Rate [m³/h]"));
+        s.append(text((plotL + plotR) / 2, H - 8, "middle", labels.get("axisWaterFlowRate")));
         s.append(String.format(Locale.US,
                 "<text x='14' y='%.1f' text-anchor='middle' transform='rotate(-90 14 %.1f)' "
-              + "font-family='Helvetica,Arial,sans-serif' font-size='10' fill='#333'>Pressure drops [kPa]</text>",
-                (plotT + plotB) / 2, (plotT + plotB) / 2));
+              + "font-family='Helvetica,Arial,sans-serif' font-size='10' fill='#333'>%s</text>",
+                (plotT + plotB) / 2, (plotT + plotB) / 2, esc(labels.get("axisPressureDrops"))));
 
         s.append("</svg>");
         return s.toString();

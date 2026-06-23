@@ -15,8 +15,15 @@ import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -41,6 +48,13 @@ public class PdfReportService {
     // The built-in PDF Helvetica only covers Latin-1, which is why those glyphs were missing.
     private final byte[] unicodeFont;
 
+    // Fetches remote unit images (primary image + drawings) so they can be embedded as data
+    // URIs, the same way the logos are — keeps PDF rendering self-contained (no live URL loads).
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(5))
+            .followRedirects(HttpClient.Redirect.NORMAL)
+            .build();
+
     public PdfReportService(WorkingLimitSvgBuilder workingLimitSvg,
                             PressureDropSvgBuilder pressureDropSvg) {
         this.workingLimitSvg = workingLimitSvg;
@@ -56,8 +70,19 @@ public class PdfReportService {
         ctx.setVariable("m", model);
         ctx.setVariable("ospLogo", ospLogoDataUri);
         ctx.setVariable("offitecLogo", offitecLogoDataUri);
-        ctx.setVariable("workingLimitSvg", workingLimitSvg.build(model.getWorkingLimit()));
-        ctx.setVariable("pressureDropSvg", pressureDropSvg.build(model.getPressureCurve()));
+        ctx.setVariable("workingLimitSvg", workingLimitSvg.build(model.getWorkingLimit(), model.getT()));
+        ctx.setVariable("pressureDropSvg", pressureDropSvg.build(model.getPressureCurve(), model.getT()));
+
+        // Embed the unit imagery as data URIs (null/failed fetches simply render nothing).
+        ctx.setVariable("primaryImage", fetchAsDataUri(model.getPrimaryImageUrl()));
+        List<String> drawings = new ArrayList<>();
+        if (model.getDrawingUrls() != null) {
+            for (String url : model.getDrawingUrls()) {
+                String dataUri = fetchAsDataUri(url);
+                if (dataUri != null) drawings.add(dataUri);
+            }
+        }
+        ctx.setVariable("drawings", drawings);
 
         String html = templateEngine.process("report", ctx);
 
@@ -101,6 +126,43 @@ public class PdfReportService {
             // Missing logo shouldn't break the whole report.
             return "";
         }
+    }
+
+    /**
+     * Fetches a remote image and returns it as a {@code data:} URI so it embeds directly in
+     * the PDF. Returns {@code null} for blank URLs or any fetch/HTTP failure so a missing or
+     * unreachable image never breaks report generation.
+     */
+    private String fetchAsDataUri(String url) {
+        if (url == null || url.isBlank()) return null;
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(8))
+                    .GET()
+                    .build();
+            HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            if (response.statusCode() != 200) return null;
+            byte[] bytes = response.body();
+            if (bytes == null || bytes.length == 0) return null;
+            return "data:" + sniffImageMime(bytes) + ";base64," + Base64.getEncoder().encodeToString(bytes);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    // Detect the image type from its magic bytes; defaults to JPEG (uploads are optimized to JPEG).
+    private String sniffImageMime(byte[] b) {
+        if (b.length >= 8 && (b[0] & 0xFF) == 0x89 && b[1] == 'P' && b[2] == 'N' && b[3] == 'G') {
+            return "image/png";
+        }
+        if (b.length >= 3 && (b[0] & 0xFF) == 0xFF && (b[1] & 0xFF) == 0xD8 && (b[2] & 0xFF) == 0xFF) {
+            return "image/jpeg";
+        }
+        if (b.length >= 6 && b[0] == 'G' && b[1] == 'I' && b[2] == 'F') {
+            return "image/gif";
+        }
+        return "image/jpeg";
     }
 
     private byte[] loadBytes(String classpath) {
