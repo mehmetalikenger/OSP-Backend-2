@@ -10,11 +10,13 @@ import org.offitec.osp.presentation.dto.PageResponse;
 import org.offitec.osp.presentation.dto.UnitCalcDataDTO;
 import org.offitec.osp.presentation.dto.UnitCardDTO;
 import org.offitec.osp.presentation.dto.UnitDetailPublicDTO;
+import org.offitec.osp.presentation.dto.UnitMatchRequestDTO;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -72,6 +74,13 @@ public class PublicUnitController {
     @PostMapping("/calculate")
     public ResponseEntity<CalculationResultDTO> calculate(@Valid @RequestBody CalculationRequestDTO dto) {
         return ResponseEntity.ok(service.calculate(dto));
+    }
+
+    // Products-page capacity match: returns the units whose computed capacity (from the
+    // posted conditions + the unit's compressor polynomial) is within targetCapacity ± %.
+    @PostMapping("/match")
+    public List<UnitCardDTO> match(@Valid @RequestBody UnitMatchRequestDTO dto) {
+        return service.matchUnits(dto);
     }
 
     @GetMapping("/saved")

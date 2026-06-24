@@ -88,6 +88,47 @@ public interface UnitJpaRepository extends JpaRepository<Unit, Long>, UnitReposi
                                     @Param("unitType") UnitTypeEnum unitType,
                                     Pageable pageable);
 
+    // Loads the candidate units for a products-page capacity match with their compressor
+    // polynomial in hand (unit -> details -> techSpecs -> compressorSpecs fetched), so the
+    // capacity for each can be computed without per-unit lazy loads. Refrigerant is an
+    // optional code filter (null = any). DISTINCT dedupes the unitDetails collection join.
+    @Query("""
+            SELECT DISTINCT u FROM Unit u
+            LEFT JOIN FETCH u.unitDetails d
+            LEFT JOIN FETCH d.techSpecs ts
+            LEFT JOIN FETCH ts.compressorSpecs cs
+            LEFT JOIN u.refrigerant r
+            WHERE u.category = :category
+              AND u.unitType = :unitType
+              AND u.deleted = false
+              AND (:refCode IS NULL OR r.code = :refCode)
+            """)
+    List<Unit> findUnitsForMatching(@Param("category") UnitCategory category,
+                                    @Param("unitType") UnitTypeEnum unitType,
+                                    @Param("refCode") String refCode);
+
+    // Same card projection as findCards, but for an explicit set of unit ids — used to build
+    // the cards for capacity-match results after the matching ids are computed in the service.
+    @Query(value = """
+            SELECT new org.offitec.osp.presentation.dto.UnitCardDTO(
+                u.id, u.name, u.model,
+                (SELECT a.url FROM UnitAsset a
+                   WHERE a.unit = u
+                     AND a.assetType = org.offitec.osp.domain.enums.AssetType.IMAGE
+                     AND a.isPrimary = true),
+                '',
+                r.code,
+                u.unitType, u.category,
+                (SELECT CASE WHEN COUNT(s) > 0 THEN true ELSE false END
+                   FROM SavedUnit s WHERE s.unit = u AND s.user.id = :userId)
+            )
+            FROM Unit u
+            LEFT JOIN u.refrigerant r
+            WHERE u.id IN :ids
+            ORDER BY u.id
+            """)
+    List<UnitCardDTO> findCardsByIds(@Param("ids") List<Long> ids, @Param("userId") Long userId);
+
     // Primary image URL per unit (the same image the catalog/saved cards show), fetched
     // for a set of units in one query. Each row is [unitId, url]. Used to put the unit's
     // image on project-detail cards without lazily loading each unit's asset collection.

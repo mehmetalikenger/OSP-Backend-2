@@ -24,6 +24,7 @@ import org.offitec.osp.presentation.dto.UnitCalcDataDTO;
 import org.offitec.osp.presentation.dto.PageResponse;
 import org.offitec.osp.presentation.dto.UnitCardDTO;
 import org.offitec.osp.presentation.dto.UnitDetailPublicDTO;
+import org.offitec.osp.presentation.dto.UnitMatchRequestDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.annotation.Lazy;
@@ -50,19 +51,22 @@ public class PublicUnitAppService {
     private final CalculationOutputValuesRepository calcOutputValsRepository;
     private final SavedUnitRepository savedUnitRepository;
     private final UserRepository userRepository;
+    private final UnitCalculationEngine calculationEngine;
 
     public PublicUnitAppService(UnitJpaRepository unitJpaRepository,
                                 UnitDetailsRepository unitDetailsRepository,
                                 CustomCalculationValuesRepository customCalcValsRepository,
                                 CalculationOutputValuesRepository calcOutputValsRepository,
                                 SavedUnitRepository savedUnitRepository,
-                                UserRepository userRepository) {
+                                UserRepository userRepository,
+                                UnitCalculationEngine calculationEngine) {
         this.unitJpaRepository = unitJpaRepository;
         this.unitDetailsRepository = unitDetailsRepository;
         this.customCalcValsRepository = customCalcValsRepository;
         this.calcOutputValsRepository = calcOutputValsRepository;
         this.savedUnitRepository = savedUnitRepository;
         this.userRepository = userRepository;
+        this.calculationEngine = calculationEngine;
     }
 
     // Self-reference so the cached, user-independent loader is invoked through the Spring
@@ -83,6 +87,55 @@ public class PublicUnitAppService {
         applyCapacities(page.getContent());
         applyIcons(page.getContent());
         return toPageResponse(page);
+    }
+
+    // --- Capacity match (products page) ---
+
+    /**
+     * Computes each candidate unit's refrigerating capacity from the user's operating
+     * conditions (the unit's compressor polynomial, scaled by compressor count) and returns
+     * the cards for units whose capacity lands within {@code targetCapacity ± diffPercent}.
+     * Candidates are the units of the given category/type, optionally narrowed by refrigerant.
+     */
+    @Transactional(readOnly = true)
+    public List<UnitCardDTO> matchUnits(UnitMatchRequestDTO dto) {
+        UnitCategory category = UnitCategory.valueOf(dto.getCategory().trim().toUpperCase());
+        UnitTypeEnum type = UnitTypeEnum.valueOf(dto.getType().trim().toUpperCase());
+        String refCode = (dto.getRefrigerant() == null || dto.getRefrigerant().isBlank())
+                ? null : dto.getRefrigerant().trim();
+
+        double target = dto.getTargetCapacity() != null ? dto.getTargetCapacity() : 0.0;
+        double pct = Math.max(dto.getDiffPercent(), 0.0);
+        double lo = target * (1.0 - pct / 100.0);
+        double hi = target * (1.0 + pct / 100.0);
+
+        List<Long> matchedIds = new ArrayList<>();
+        for (Unit unit : unitJpaRepository.findUnitsForMatching(category, type, refCode)) {
+            if (unit.getUnitDetails() == null) continue;
+            // Capacity is evaluated on the cooling mode (the rating point for chillers).
+            UnitDetails cooling = unit.getUnitDetails().stream()
+                    .filter(d -> d.getMod() == Mod.COOLING
+                            && d.getTechSpecs() != null
+                            && d.getTechSpecs().getCompressorSpecs() != null)
+                    .findFirst()
+                    .orElse(null);
+            if (cooling == null) continue;
+
+            double capacityKw = calculationEngine.compute(
+                    cooling.getTechSpecs().getCompressorSpecs(),
+                    unit.getCompressorQty(),
+                    dto.getAmbient(),
+                    dto.getEvapOut()).capacityKw();
+
+            if (capacityKw >= lo && capacityKw <= hi) matchedIds.add(unit.getId());
+        }
+
+        if (matchedIds.isEmpty()) return List.of();
+
+        List<UnitCardDTO> cards = unitJpaRepository.findCardsByIds(matchedIds, currentUserId());
+        applyCapacities(cards);
+        applyIcons(cards);
+        return cards;
     }
 
     // --- Detail ---
@@ -375,11 +428,8 @@ public class PublicUnitAppService {
                 .collect(Collectors.joining(", "));
     }
 
-    // "38.0 - 45.0 kW" when a max capacity is set, otherwise "38.0 kW".
+    // Just the single capacity value ("38.0 kW"); the max capacity is intentionally not shown.
     private String capRange(ModeCapacity m) {
-        if (m.maxCapacity() > 0 && m.maxCapacity() > m.capacity()) {
-            return String.format("%.1f - %.1f kW", m.capacity(), m.maxCapacity());
-        }
         return String.format("%.1f kW", m.capacity());
     }
 
