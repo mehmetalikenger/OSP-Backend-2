@@ -29,6 +29,7 @@ public class UnitAppService {
     private final UnitDomainService unitDomainService;
     private final UnitJpaRepository unitJpaRepository;
     private final CompressorSpecsRepository compressorSpecsRepository;
+    private final org.offitec.osp.infrastructure.repository.CompressorRatingRepository compressorRatingRepository;
     private final CondenserSpecsRepository condenserSpecsRepository;
     private final EvaporatorSpecsRepository evaporatorSpecsRepository;
     private final ExpansionValveSpecsRepository expansionValveSpecsRepository;
@@ -43,6 +44,7 @@ public class UnitAppService {
     public UnitAppService(UnitDomainService unitDomainService,
                           UnitJpaRepository unitJpaRepository,
                           CompressorSpecsRepository compressorSpecsRepository,
+                          org.offitec.osp.infrastructure.repository.CompressorRatingRepository compressorRatingRepository,
                           CondenserSpecsRepository condenserSpecsRepository,
                           EvaporatorSpecsRepository evaporatorSpecsRepository,
                           ExpansionValveSpecsRepository expansionValveSpecsRepository,
@@ -56,6 +58,7 @@ public class UnitAppService {
         this.unitDomainService = unitDomainService;
         this.unitJpaRepository = unitJpaRepository;
         this.compressorSpecsRepository = compressorSpecsRepository;
+        this.compressorRatingRepository = compressorRatingRepository;
         this.condenserSpecsRepository = condenserSpecsRepository;
         this.evaporatorSpecsRepository = evaporatorSpecsRepository;
         this.expansionValveSpecsRepository = expansionValveSpecsRepository;
@@ -353,7 +356,6 @@ public class UnitAppService {
         r.setCompressorQty(unit.getCompressorQty());
         r.setCondenserQty(unit.getCondenserQty());
         r.setExpansionValveQty(unit.getExpansionValveQty());
-        r.setRefrigerantId(unit.getRefrigerant() != null ? unit.getRefrigerant().getId() : null);
         r.setFanPI(unit.getFanPI());
         r.setWidth(unit.getWidth());
         r.setLength(unit.getLength());
@@ -382,6 +384,7 @@ public class UnitAppService {
         r.setCondenserRequiredDuty(ts.getCondenserRequiredDuty());
         r.setQuietCondenserRequiredDuty(ts.getQuietCondenserRequiredDuty());
         r.setCompressorSpecsId(ts.getCompressorSpecs() != null ? ts.getCompressorSpecs().getId() : null);
+        r.setCompressorRatingId(ts.getCompressorRating() != null ? ts.getCompressorRating().getId() : null);
         r.setCondenserSpecsId(ts.getCondenserSpecs() != null ? ts.getCondenserSpecs().getId() : null);
         r.setEvaporatorSpecsId(ts.getEvaporatorSpecs() != null ? ts.getEvaporatorSpecs().getId() : null);
         r.setExpansionValveSpecsId(ts.getExpansionValveSpecs() != null ? ts.getExpansionValveSpecs().getId() : null);
@@ -498,6 +501,7 @@ public class UnitAppService {
 
         TechSpecs techSpecs = new TechSpecs();
         applyModeSpecs(techSpecs, dto.getModeSpecsDto());
+        techSpecs.setCompressorRating(unit.getCompressorRating()); // shared, chosen on the model form
 
         DefaultCalculationValues calcValues = new DefaultCalculationValues();
         applyCalcValues(calcValues, dto.getUnitDefCalcValuesDTO());
@@ -547,9 +551,9 @@ public class UnitAppService {
         r.setType(unit.getUnitType().name());
 
         r.setCompressorQty(unit.getCompressorQty());
+        r.setCompressorRatingId(unit.getCompressorRating() != null ? unit.getCompressorRating().getId() : null);
         r.setCondenserQty(unit.getCondenserQty());
         r.setExpansionValveQty(unit.getExpansionValveQty());
-        r.setRefrigerantId(unit.getRefrigerant() != null ? unit.getRefrigerant().getId() : null);
         r.setFanPI(unit.getFanPI());
         r.setWidth(unit.getWidth());
         r.setLength(unit.getLength());
@@ -579,6 +583,7 @@ public class UnitAppService {
                 m.setCondenserRequiredDuty(ts.getCondenserRequiredDuty());
                 m.setQuietCondenserRequiredDuty(ts.getQuietCondenserRequiredDuty());
                 m.setCompressorSpecsId(ts.getCompressorSpecs() != null ? ts.getCompressorSpecs().getId() : null);
+                m.setCompressorRatingId(ts.getCompressorRating() != null ? ts.getCompressorRating().getId() : null);
                 m.setCondenserSpecsId(ts.getCondenserSpecs() != null ? ts.getCondenserSpecs().getId() : null);
                 m.setEvaporatorSpecsId(ts.getEvaporatorSpecs() != null ? ts.getEvaporatorSpecs().getId() : null);
                 m.setExpansionValveSpecsId(ts.getExpansionValveSpecs() != null ? ts.getExpansionValveSpecs().getId() : null);
@@ -641,6 +646,7 @@ public class UnitAppService {
         }
 
         applyModeSpecs(details.getTechSpecs(), dto.getModeSpecsDto());
+        details.getTechSpecs().setCompressorRating(unit.getCompressorRating()); // shared, from the model form
         applyCalcValues(details.getDefCalcValues(), dto.getUnitDefCalcValuesDTO());
 
         unitJpaRepository.save(unit);
@@ -653,8 +659,6 @@ public class UnitAppService {
         unit.setCompressorQty(d.getCompressorQty());
         unit.setCondenserQty(d.getCondenserQty());
         unit.setExpansionValveQty(d.getExpansionValveQty());
-        unit.setRefrigerant(refrigerantRepository.findById(d.getRefrigerantId())
-                .orElseThrow(() -> new RefrigerantDoesntExistException("Selected refrigerant doesn't exist.")));
         unit.setChassis(chassisRepository.findById(d.getChassisId())
                 .orElseThrow(() -> new ChassisDoesntExistException("Selected chassis doesn't exist.")));
         unit.setFanPI(d.getFanPI());
@@ -679,6 +683,20 @@ public class UnitAppService {
         unit.setMaxAmbient(d.getMaxAmbient());
     }
 
+    // A unit's compressor can be selected either as an imported Frascold rating (model + refrigerant,
+    // the new AW flow) or as a legacy CompressorSpecs. At least one must be present.
+    private void applyCompressorSelection(TechSpecs ts, Long compressorSpecsId, Long compressorRatingId) {
+        ts.setCompressorRating(compressorRatingId == null ? null :
+                compressorRatingRepository.findById(compressorRatingId)
+                        .orElseThrow(() -> new CompressorSpecsDoesntExistException("Selected compressor model doesn't exist.")));
+        ts.setCompressorSpecs(compressorSpecsId == null ? null :
+                compressorSpecsRepository.findById(compressorSpecsId)
+                        .orElseThrow(() -> new CompressorSpecsDoesntExistException("Selected compressor doesn't exist.")));
+        if (ts.getCompressorRating() == null && ts.getCompressorSpecs() == null) {
+            throw new CompressorSpecsDoesntExistException("A compressor must be selected.");
+        }
+    }
+
     // Per-mode attributes + the component spec points selected for that mode.
     void applyModeSpecs(TechSpecs ts, UnitTechSpecsDTO d) {
         ts.setCapacity(d.getCapacity());
@@ -687,8 +705,7 @@ public class UnitAppService {
         ts.setCondenserRequiredDuty(d.getCondenserRequiredDuty());
         ts.setQuietCondenserRequiredDuty(d.getQuietCondenserRequiredDuty());
 
-        ts.setCompressorSpecs(compressorSpecsRepository.findById(d.getCompressorSpecsId())
-                .orElseThrow(() -> new CompressorSpecsDoesntExistException("Selected compressor doesn't exist.")));
+        applyCompressorSelection(ts, d.getCompressorSpecsId(), d.getCompressorRatingId());
         ts.setCondenserSpecs(condenserSpecsRepository.findById(d.getCondenserSpecsId())
                 .orElseThrow(() -> new CondenserSpecsDoesntExistException("Selected condenser doesn't exist.")));
         ts.setEvaporatorSpecs(evaporatorSpecsRepository.findById(d.getEvaporatorSpecsId())
@@ -710,8 +727,6 @@ public class UnitAppService {
         unit.setCompressorQty(d.getCompressorQty());
         unit.setCondenserQty(d.getCondenserQty());
         unit.setExpansionValveQty(d.getExpansionValveQty());
-        unit.setRefrigerant(refrigerantRepository.findById(d.getRefrigerantId())
-                .orElseThrow(() -> new RefrigerantDoesntExistException("Selected refrigerant doesn't exist.")));
         unit.setChassis(chassisRepository.findById(d.getChassisId())
                 .orElseThrow(() -> new ChassisDoesntExistException("Selected chassis doesn't exist.")));
         unit.setFanPI(d.getFanPI());
@@ -734,6 +749,18 @@ public class UnitAppService {
         unit.setMaxWaterOutlet(d.getMaxWaterOutlet());
         unit.setMinAmbient(d.getMinAmbient());
         unit.setMaxAmbient(d.getMaxAmbient());
+
+        // Unit-level compressor (shared by both heat-pump modes). Resolve and propagate to any modes
+        // that already exist so editing the model updates them.
+        CompressorRating rating = d.getCompressorRatingId() == null ? null
+                : compressorRatingRepository.findById(d.getCompressorRatingId())
+                        .orElseThrow(() -> new CompressorSpecsDoesntExistException("Selected compressor model doesn't exist."));
+        unit.setCompressorRating(rating);
+        if (unit.getUnitDetails() != null) {
+            for (UnitDetails md : unit.getUnitDetails()) {
+                if (md.getTechSpecs() != null) md.getTechSpecs().setCompressorRating(rating);
+            }
+        }
     }
 
     void applyModeSpecs(TechSpecs ts, UnitModeSpecsDTO d) {
@@ -743,8 +770,8 @@ public class UnitAppService {
         ts.setCondenserRequiredDuty(d.getCondenserRequiredDuty());
         ts.setQuietCondenserRequiredDuty(d.getQuietCondenserRequiredDuty());
 
-        ts.setCompressorSpecs(compressorSpecsRepository.findById(d.getCompressorSpecsId())
-                .orElseThrow(() -> new CompressorSpecsDoesntExistException("Selected compressor doesn't exist.")));
+        // Heat-pump compressor is a unit-level selection (shared by both modes), applied from
+        // unit.compressorRating by the caller — not per mode.
         ts.setCondenserSpecs(condenserSpecsRepository.findById(d.getCondenserSpecsId())
                 .orElseThrow(() -> new CondenserSpecsDoesntExistException("Selected condenser doesn't exist.")));
         ts.setEvaporatorSpecs(evaporatorSpecsRepository.findById(d.getEvaporatorSpecsId())

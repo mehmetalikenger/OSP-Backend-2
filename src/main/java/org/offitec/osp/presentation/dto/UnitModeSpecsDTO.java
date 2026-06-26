@@ -13,8 +13,10 @@ public class UnitModeSpecsDTO {
     public double condenserRequiredDuty;
     public double quietCondenserRequiredDuty;
 
-    @NotNull(message = "Compressor must be selected.")
+    // Legacy detailed-coefficient compressor (optional now); AW units use compressorRatingId instead.
     public Long compressorSpecsId;
+    // Imported Frascold rating id (model + refrigerant). When set, the faithful engine is used.
+    public Long compressorRatingId;
 
     @NotNull(message = "Condenser must be selected.")
     public Long condenserSpecsId;

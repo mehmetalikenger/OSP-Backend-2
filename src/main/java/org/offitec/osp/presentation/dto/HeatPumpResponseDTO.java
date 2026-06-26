@@ -20,9 +20,10 @@ public class HeatPumpResponseDTO {
 
     // common (unit-level)
     private int compressorQty;
+    // Unit-level compressor (model + refrigerant) shared by both modes, for the model-form picker.
+    private Long compressorRatingId;
     private int condenserQty;
     private int expansionValveQty;
-    private Long refrigerantId;
     private Long chassisId;
     private double fanPI;
     private double width;

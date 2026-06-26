@@ -17,6 +17,7 @@ public class HeatPumpModeDTO {
     private double quietCondenserRequiredDuty;
 
     private Long compressorSpecsId;
+    private Long compressorRatingId;
     private Long condenserSpecsId;
     private Long evaporatorSpecsId;
     private Long expansionValveSpecsId;

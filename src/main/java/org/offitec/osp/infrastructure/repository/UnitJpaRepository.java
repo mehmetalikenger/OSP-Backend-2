@@ -35,14 +35,12 @@ public interface UnitJpaRepository extends JpaRepository<Unit, Long>, UnitReposi
                      AND a.assetType = org.offitec.osp.domain.enums.AssetType.IMAGE
                      AND a.isPrimary = true),
                 '',
-                r.code,
+                '',
                 u.unitType, u.category,
                 (SELECT CASE WHEN COUNT(s) > 0 THEN true ELSE false END
                    FROM SavedUnit s WHERE s.unit = u AND s.user.id = :userId)
             )
-            FROM Unit u
-            LEFT JOIN u.refrigerant r
-            WHERE u.category = :category AND u.unitType = :unitType AND u.deleted = false
+            FROM Unit u            WHERE u.category = :category AND u.unitType = :unitType AND u.deleted = false
             ORDER BY u.id
             """,
             countQuery = """
@@ -64,14 +62,12 @@ public interface UnitJpaRepository extends JpaRepository<Unit, Long>, UnitReposi
                      AND a.assetType = org.offitec.osp.domain.enums.AssetType.IMAGE
                      AND a.isPrimary = true),
                 '',
-                r.code,
+                '',
                 u.unitType, u.category,
                 true
             )
             FROM SavedUnit s
-            JOIN s.unit u
-            LEFT JOIN u.refrigerant r
-            WHERE s.user.id = :userId AND u.deleted = false
+            JOIN s.unit u            WHERE s.user.id = :userId AND u.deleted = false
               AND (:category IS NULL OR u.category = :category)
               AND (:unitType IS NULL OR u.unitType = :unitType)
             ORDER BY u.id
@@ -96,12 +92,15 @@ public interface UnitJpaRepository extends JpaRepository<Unit, Long>, UnitReposi
             SELECT DISTINCT u FROM Unit u
             LEFT JOIN FETCH u.unitDetails d
             LEFT JOIN FETCH d.techSpecs ts
-            LEFT JOIN FETCH ts.compressorSpecs cs
-            LEFT JOIN u.refrigerant r
-            WHERE u.category = :category
+            LEFT JOIN FETCH ts.compressorSpecs cs            WHERE u.category = :category
               AND u.unitType = :unitType
               AND u.deleted = false
-              AND (:refCode IS NULL OR r.code = :refCode)
+              AND (:refCode IS NULL OR EXISTS (
+                    SELECT 1 FROM UnitDetails d2
+                    JOIN d2.techSpecs ts2
+                    JOIN ts2.compressorSpecs cs2
+                    JOIN cs2.compressor cmp2
+                    WHERE d2.unit = u AND cmp2.refrigerant.code = :refCode))
             """)
     List<Unit> findUnitsForMatching(@Param("category") UnitCategory category,
                                     @Param("unitType") UnitTypeEnum unitType,
@@ -117,14 +116,12 @@ public interface UnitJpaRepository extends JpaRepository<Unit, Long>, UnitReposi
                      AND a.assetType = org.offitec.osp.domain.enums.AssetType.IMAGE
                      AND a.isPrimary = true),
                 '',
-                r.code,
+                '',
                 u.unitType, u.category,
                 (SELECT CASE WHEN COUNT(s) > 0 THEN true ELSE false END
                    FROM SavedUnit s WHERE s.unit = u AND s.user.id = :userId)
             )
-            FROM Unit u
-            LEFT JOIN u.refrigerant r
-            WHERE u.id IN :ids
+            FROM Unit u            WHERE u.id IN :ids
             ORDER BY u.id
             """)
     List<UnitCardDTO> findCardsByIds(@Param("ids") List<Long> ids, @Param("userId") Long userId);
@@ -150,6 +147,20 @@ public interface UnitJpaRepository extends JpaRepository<Unit, Long>, UnitReposi
             """)
     List<Object[]> findIconUrls(@Param("unitIds") List<Long> unitIds);
 
+    // Refrigerant code per unit, derived from the unit's compressor (refrigerant moved to
+    // the Compressor). Each row is [unitId, refrigerantCode]. A unit may have several modes
+    // (hence several rows); the service picks one representative. Used to fill the catalog/
+    // saved card `refrigerant` field in one query (same N+1-avoidance as findIconUrls).
+    @Query("""
+            SELECT DISTINCT d.unit.id, cmp.refrigerant.code
+            FROM UnitDetails d
+            JOIN d.techSpecs ts
+            JOIN ts.compressorSpecs cs
+            JOIN cs.compressor cmp
+            WHERE d.unit.id IN :unitIds AND cmp.refrigerant IS NOT NULL
+            """)
+    List<Object[]> findRefrigerantCodesByUnitIds(@Param("unitIds") List<Long> unitIds);
+
     // Loads the whole detail/calc graph in ONE query so the spec/calc views don't
     // walk a chain of lazy associations (unit -> details -> techSpecs -> each component
     // spec -> component). Only collection fetched is u.unitDetails (a single bag, so no
@@ -158,12 +169,12 @@ public interface UnitJpaRepository extends JpaRepository<Unit, Long>, UnitReposi
     @Query("""
             SELECT DISTINCT u FROM Unit u
             LEFT JOIN FETCH u.chassis
-            LEFT JOIN FETCH u.refrigerant
             LEFT JOIN FETCH u.unitDetails d
             LEFT JOIN FETCH d.defCalcValues
             LEFT JOIN FETCH d.techSpecs ts
             LEFT JOIN FETCH ts.compressorSpecs cs
-            LEFT JOIN FETCH cs.compressor
+            LEFT JOIN FETCH cs.compressor cmp
+            LEFT JOIN FETCH cmp.refrigerant
             LEFT JOIN FETCH ts.condenserSpecs cds
             LEFT JOIN FETCH cds.condenser
             LEFT JOIN FETCH ts.evaporatorSpecs es

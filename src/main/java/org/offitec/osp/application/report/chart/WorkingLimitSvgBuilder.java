@@ -20,6 +20,7 @@ public class WorkingLimitSvgBuilder {
     private static final int LEFT = 55, RIGHT = 20, TOP = 15, BOTTOM = 45;
 
     public String build(UnitReportModel.WorkingLimit wl, Map<String, String> labels) {
+        if (labels == null) labels = java.util.Collections.emptyMap();
         double plotL = LEFT, plotR = W - RIGHT, plotT = TOP, plotB = H - BOTTOM;
 
         // Domains padded to include both the safe rectangle and the operating point.
@@ -69,11 +70,11 @@ public class WorkingLimitSvgBuilder {
         s.append(labelBox(px + 6, py - 10, ptLabel));
 
         // Axis titles
-        s.append(text((plotL + plotR) / 2, H - 8, "middle", labels.get("axisWaterOutletTemp")));
+        s.append(text((plotL + plotR) / 2, H - 8, "middle", labels.getOrDefault("axisWaterOutletTemp", "")));
         s.append(String.format(Locale.US,
                 "<text x='14' y='%.1f' text-anchor='middle' transform='rotate(-90 14 %.1f)' "
               + "font-family='Helvetica,Arial,sans-serif' font-size='10' fill='#333'>%s</text>",
-                (plotT + plotB) / 2, (plotT + plotB) / 2, esc(labels.get("axisAmbientTemp"))));
+                (plotT + plotB) / 2, (plotT + plotB) / 2, esc(labels.getOrDefault("axisAmbientTemp", ""))));
 
         s.append("</svg>");
         return s.toString();

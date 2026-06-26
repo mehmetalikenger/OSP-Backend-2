@@ -66,8 +66,16 @@ public class ComponentAppService {
         compressor.setModel(dto.getModel());
         compressor.setMoc(dto.getMoc());
         compressor.setLra(dto.getLra());
+        compressor.setRefrigerant(resolveRefrigerant(dto.getRefrigerantId()));
 
         compressorRepository.save(compressor);
+    }
+
+    // Resolves an optional refrigerant id to its entity (null id -> null, unknown id -> error).
+    private Refrigerant resolveRefrigerant(Long refrigerantId) {
+        if (refrigerantId == null) return null;
+        return refrigerantRepository.findById(refrigerantId)
+                .orElseThrow(() -> new RefrigerantDoesntExistException("Selected refrigerant doesn't exist."));
     }
 
     public List<Compressor> getAllCompressors() {
@@ -87,18 +95,35 @@ public class ComponentAppService {
 
         CompressorSpecs specs = new CompressorSpecs();
         specs.setCompressor(compressor);
+        applyCompressorSpecsFields(specs, dto);
+
+        compressorSpecsRepository.save(specs);
+    }
+
+    // Shared field copy for add/edit compressor specs (capacity/power, RPMs and all
+    // capacity/power coefficients). RPMs and qC11..qC20 are ISCR-only (null otherwise).
+    private void applyCompressorSpecsFields(CompressorSpecs specs, CompressorSpecsDTO dto) {
         specs.setCapacity(dto.getCapacity());
         specs.setPowerInput(dto.getPowerInput());
+        specs.setRpmBase(dto.getRpmBase());
+        specs.setRpmMin(dto.getRpmMin());
+        specs.setRpmMax(dto.getRpmMax());
         specs.setQC1(dto.getQC1()); specs.setQC2(dto.getQC2()); specs.setQC3(dto.getQC3());
         specs.setQC4(dto.getQC4()); specs.setQC5(dto.getQC5()); specs.setQC6(dto.getQC6());
         specs.setQC7(dto.getQC7()); specs.setQC8(dto.getQC8()); specs.setQC9(dto.getQC9());
         specs.setQC10(dto.getQC10());
+        specs.setQC11(dto.getQC11()); specs.setQC12(dto.getQC12()); specs.setQC13(dto.getQC13());
+        specs.setQC14(dto.getQC14()); specs.setQC15(dto.getQC15()); specs.setQC16(dto.getQC16());
+        specs.setQC17(dto.getQC17()); specs.setQC18(dto.getQC18()); specs.setQC19(dto.getQC19());
+        specs.setQC20(dto.getQC20());
         specs.setPC1(dto.getPC1()); specs.setPC2(dto.getPC2()); specs.setPC3(dto.getPC3());
         specs.setPC4(dto.getPC4()); specs.setPC5(dto.getPC5()); specs.setPC6(dto.getPC6());
         specs.setPC7(dto.getPC7()); specs.setPC8(dto.getPC8()); specs.setPC9(dto.getPC9());
         specs.setPC10(dto.getPC10());
-
-        compressorSpecsRepository.save(specs);
+        specs.setPC11(dto.getPC11()); specs.setPC12(dto.getPC12()); specs.setPC13(dto.getPC13());
+        specs.setPC14(dto.getPC14()); specs.setPC15(dto.getPC15()); specs.setPC16(dto.getPC16());
+        specs.setPC17(dto.getPC17()); specs.setPC18(dto.getPC18()); specs.setPC19(dto.getPC19());
+        specs.setPC20(dto.getPC20());
     }
 
     @Transactional
@@ -119,6 +144,7 @@ public class ComponentAppService {
         compressor.setModel(dto.getModel());
         compressor.setMoc(dto.getMoc());
         compressor.setLra(dto.getLra());
+        compressor.setRefrigerant(resolveRefrigerant(dto.getRefrigerantId()));
 
         compressorRepository.save(compressor);
     }
@@ -134,16 +160,7 @@ public class ComponentAppService {
         }
 
         CompressorSpecs specs = dbSpecs.get();
-        specs.setCapacity(dto.getCapacity());
-        specs.setPowerInput(dto.getPowerInput());
-        specs.setQC1(dto.getQC1()); specs.setQC2(dto.getQC2()); specs.setQC3(dto.getQC3());
-        specs.setQC4(dto.getQC4()); specs.setQC5(dto.getQC5()); specs.setQC6(dto.getQC6());
-        specs.setQC7(dto.getQC7()); specs.setQC8(dto.getQC8()); specs.setQC9(dto.getQC9());
-        specs.setQC10(dto.getQC10());
-        specs.setPC1(dto.getPC1()); specs.setPC2(dto.getPC2()); specs.setPC3(dto.getPC3());
-        specs.setPC4(dto.getPC4()); specs.setPC5(dto.getPC5()); specs.setPC6(dto.getPC6());
-        specs.setPC7(dto.getPC7()); specs.setPC8(dto.getPC8()); specs.setPC9(dto.getPC9());
-        specs.setPC10(dto.getPC10());
+        applyCompressorSpecsFields(specs, dto);
 
         compressorSpecsRepository.save(specs);
     }
@@ -158,15 +175,28 @@ public class ComponentAppService {
                 dto.setBrand(specs.getCompressor().getBrand());
                 dto.setModel(specs.getCompressor().getModel());
                 dto.setType(specs.getCompressor().getType().name());
+                dto.setRefrigerantId(specs.getCompressor().getRefrigerant() != null
+                        ? specs.getCompressor().getRefrigerant().getId() : null);
             }
+            dto.setRpmBase(specs.getRpmBase());
+            dto.setRpmMin(specs.getRpmMin());
+            dto.setRpmMax(specs.getRpmMax());
             dto.setQC1(specs.getQC1()); dto.setQC2(specs.getQC2()); dto.setQC3(specs.getQC3());
             dto.setQC4(specs.getQC4()); dto.setQC5(specs.getQC5()); dto.setQC6(specs.getQC6());
             dto.setQC7(specs.getQC7()); dto.setQC8(specs.getQC8()); dto.setQC9(specs.getQC9());
             dto.setQC10(specs.getQC10());
+            dto.setQC11(specs.getQC11()); dto.setQC12(specs.getQC12()); dto.setQC13(specs.getQC13());
+            dto.setQC14(specs.getQC14()); dto.setQC15(specs.getQC15()); dto.setQC16(specs.getQC16());
+            dto.setQC17(specs.getQC17()); dto.setQC18(specs.getQC18()); dto.setQC19(specs.getQC19());
+            dto.setQC20(specs.getQC20());
             dto.setPC1(specs.getPC1()); dto.setPC2(specs.getPC2()); dto.setPC3(specs.getPC3());
             dto.setPC4(specs.getPC4()); dto.setPC5(specs.getPC5()); dto.setPC6(specs.getPC6());
             dto.setPC7(specs.getPC7()); dto.setPC8(specs.getPC8()); dto.setPC9(specs.getPC9());
             dto.setPC10(specs.getPC10());
+            dto.setPC11(specs.getPC11()); dto.setPC12(specs.getPC12()); dto.setPC13(specs.getPC13());
+            dto.setPC14(specs.getPC14()); dto.setPC15(specs.getPC15()); dto.setPC16(specs.getPC16());
+            dto.setPC17(specs.getPC17()); dto.setPC18(specs.getPC18()); dto.setPC19(specs.getPC19());
+            dto.setPC20(specs.getPC20());
             return dto;
         }).collect(Collectors.toList());
     }

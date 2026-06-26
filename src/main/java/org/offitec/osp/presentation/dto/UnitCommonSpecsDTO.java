@@ -13,8 +13,8 @@ public class UnitCommonSpecsDTO {
     public int condenserQty;
     public int expansionValveQty;
 
-    @NotNull(message = "Refrigerant must be selected.")
-    public Long refrigerantId;
+    // Unit-level compressor (model + refrigerant) shared by both heat-pump modes, picked on the model form.
+    public Long compressorRatingId;
 
     @NotNull(message = "Chassis must be selected.")
     public Long chassisId;

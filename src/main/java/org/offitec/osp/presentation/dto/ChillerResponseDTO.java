@@ -30,6 +30,8 @@ public class ChillerResponseDTO {
     private double capacity;
     private double maxCapacity;
     private Long compressorSpecsId;
+    // Imported Frascold rating (model + refrigerant) the unit is assigned to, for the new picker.
+    private Long compressorRatingId;
     private int compressorQty;
     private Long condenserSpecsId;
     private int condenserQty;
@@ -38,7 +40,6 @@ public class ChillerResponseDTO {
     private Long evaporatorSpecsId;
     private Long chassisId;
     private Long fourWayReversingValveSpecsId;
-    private Long refrigerantId;
     private double condenserRequiredDuty;
     private double quietCondenserRequiredDuty;
     private double fanPI;

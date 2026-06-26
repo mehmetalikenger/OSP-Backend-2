@@ -42,6 +42,7 @@ public class UnitReportModel {
     private final String ambient;              // "35"
     private final String waterInlet;           // "12"
     private final String waterOutlet;          // "7"
+    private final String glycolMixture;        // "Ethylene Glycol 30%" or "None"
 
     // --- Unit specifications ---
     private final String coolingCapacityKcalh; // "91,295"
@@ -49,6 +50,18 @@ public class UnitReportModel {
     private final String inputPowerKw;         // "38.0"
     private final String eerCopLabel;          // "EER" or "COP"
     private final String eerCopValue;          // "2.80"
+
+    // --- Heat-pump dual-mode block (only populated when dualMode is true) ---
+    // The fields above carry the COOLING point; these carry the HEATING point.
+    private final boolean dualMode;
+    private final String heatingAmbient;
+    private final String heatingWaterInlet;
+    private final String heatingWaterOutlet;
+    private final String heatingCapacityKcalh;
+    private final String heatingCapacityKw;
+    private final String heatingInputPowerKw;
+    private final String heatingCopValue;
+    private final List<FullLoadRow> heatingFullLoad;   // heating full-load table (dual-mode only)
 
     // --- Full load cooling table (ambient -10..40) ---
     private final List<FullLoadRow> fullLoad;
@@ -88,6 +101,10 @@ public class UnitReportModel {
     // --- Raw chart data (consumed by the SVG builders, not the table cells) ---
     private final WorkingLimit workingLimit;
     private final PressureCurve pressureCurve;
+
+    // Heat-pump dual-mode chart data (heating point). Null for single-mode reports.
+    private final WorkingLimit heatingWorkingLimit;
+    private final PressureCurve heatingPressureCurve;
 
     @Getter
     @Builder

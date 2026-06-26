@@ -52,6 +52,7 @@ public class PublicUnitAppService {
     private final SavedUnitRepository savedUnitRepository;
     private final UserRepository userRepository;
     private final UnitCalculationEngine calculationEngine;
+    private final CompressorPerformanceEngine performanceEngine;
 
     public PublicUnitAppService(UnitJpaRepository unitJpaRepository,
                                 UnitDetailsRepository unitDetailsRepository,
@@ -59,7 +60,8 @@ public class PublicUnitAppService {
                                 CalculationOutputValuesRepository calcOutputValsRepository,
                                 SavedUnitRepository savedUnitRepository,
                                 UserRepository userRepository,
-                                UnitCalculationEngine calculationEngine) {
+                                UnitCalculationEngine calculationEngine,
+                                CompressorPerformanceEngine performanceEngine) {
         this.unitJpaRepository = unitJpaRepository;
         this.unitDetailsRepository = unitDetailsRepository;
         this.customCalcValsRepository = customCalcValsRepository;
@@ -67,6 +69,7 @@ public class PublicUnitAppService {
         this.savedUnitRepository = savedUnitRepository;
         this.userRepository = userRepository;
         this.calculationEngine = calculationEngine;
+        this.performanceEngine = performanceEngine;
     }
 
     // Self-reference so the cached, user-independent loader is invoked through the Spring
@@ -83,9 +86,10 @@ public class PublicUnitAppService {
         Long userId = currentUserId();
         // Query 1: one page of cards (scalar fields + primary image + saved flag).
         Page<UnitCardDTO> page = unitJpaRepository.findCards(category, unitType, userId, pageable);
-        // Query 2 & 3: per-mode capacities and icon URLs for just this page's units.
+        // Query 2..4: per-mode capacities, icon URLs and refrigerant codes for this page's units.
         applyCapacities(page.getContent());
         applyIcons(page.getContent());
+        applyRefrigerants(page.getContent());
         return toPageResponse(page);
     }
 
@@ -135,6 +139,7 @@ public class PublicUnitAppService {
         List<UnitCardDTO> cards = unitJpaRepository.findCardsByIds(matchedIds, currentUserId());
         applyCapacities(cards);
         applyIcons(cards);
+        applyRefrigerants(cards);
         return cards;
     }
 
@@ -195,6 +200,7 @@ public class PublicUnitAppService {
         Page<UnitCardDTO> page = unitJpaRepository.findSavedCards(userId, category, unitType, pageable);
         applyCapacities(page.getContent());
         applyIcons(page.getContent());
+        applyRefrigerants(page.getContent());
         return toPageResponse(page);
     }
 
@@ -273,25 +279,32 @@ public class PublicUnitAppService {
         TechSpecs techSpecs = details.getTechSpecs();
         if (techSpecs == null) throw new RuntimeException("Tech specs not configured for this unit.");
 
+        GlycolCorrection.Factors gf = mod == Mod.HEATING
+                ? GlycolCorrection.Factors.NONE
+                : GlycolCorrection.lookup(dto.getGlycolType(), dto.getGlycolPercentage());
+
+        // Prefer the faithful FSS3 engine when the unit is linked to an imported, calculable rating.
+        CompressorRating rating = techSpecs.getCompressorRating();
+        if (canUseFaithfulEngine(rating)) {
+            CalculationResultDTO faithful = calculateFaithful(unit, rating, mod, dto, gf);
+            if (faithful != null) return faithful;
+            // fall through to the legacy engine if the operating point produced no valid cycle
+        }
+
         CompressorSpecs specs = techSpecs.getCompressorSpecs();
         if (specs == null) throw new RuntimeException("Compressor specs not configured for this unit.");
 
-        double S = dto.getEvapOut() - 5;
-        double D = dto.getAmbient() + 15;
+        // Heating is rated on the hot-water (condenser) outlet; cooling on the chilled-water
+        // (evaporator) outlet. The engine derives the polynomial variables from the mode and
+        // picks the ISCR/Copeland trivariate formula when applicable.
+        double leavingWaterTemp = mod == Mod.HEATING ? dto.getCondOut() : dto.getEvapOut();
+        UnitCalculationEngine.Result design = calculationEngine.compute(
+                specs, unit.getCompressorQty(), mod, dto.getAmbient(), leavingWaterTemp);
 
-        double q = evalPolynomial(S, D,
-                specs.getQC1(), specs.getQC2(), specs.getQC3(), specs.getQC4(), specs.getQC5(),
-                specs.getQC6(), specs.getQC7(), specs.getQC8(), specs.getQC9(), specs.getQC10());
-
-        double p = evalPolynomial(S, D,
-                specs.getPC1(), specs.getPC2(), specs.getPC3(), specs.getPC4(), specs.getPC5(),
-                specs.getPC6(), specs.getPC7(), specs.getPC8(), specs.getPC9(), specs.getPC10());
-
-        // The polynomials return power in WATTS; convert the totals to kW. A selected glycol
-        // mixture scales capacity and power by its correction factors.
-        GlycolCorrection.Factors gf = GlycolCorrection.lookup(dto.getGlycolType(), dto.getGlycolPercentage());
-        double totalQ = q * unit.getCompressorQty() / 1000.0 * gf.capacity();
-        double totalP = p * unit.getCompressorQty() / 1000.0 * gf.power();
+        // A selected glycol mixture scales capacity, power and pressure drop by its factors.
+        // Heating heats the water (no glycol needed), so the correction is skipped for heating.
+        double totalQ = design.capacityKw() * gf.capacity();
+        double totalP = design.powerKw() * gf.power();
         double copEer = totalP > 0 ? totalQ / totalP : 0;
 
         double pressureDrop = 50.0 * gf.pressureDrop();
@@ -300,44 +313,79 @@ public class PublicUnitAppService {
         // calculation page and the PDF show the same value: capacity(kW) * 860 / 5000 (m³/h).
         double flowRate = totalQ * 860.0 / 5000.0;
 
-        CustomCalculationValues customVals = new CustomCalculationValues(
+        CustomCalculationValues customVals = customCalcValsRepository.save(new CustomCalculationValues(
                 null,
                 dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(), dto.getCondIn(), dto.getCondOut(),
-                dto.getGlycolType(), dto.getGlycolPercentage()
-        );
-        customVals = customCalcValsRepository.save(customVals);
+                dto.getGlycolType(), dto.getGlycolPercentage()));
 
-        CalculationOutputValues outputVals = new CalculationOutputValues(
-                null,
-                totalQ,
-                totalQ,
-                totalP,
-                totalQ + totalP,
-                0,
-                copEer,
-                0,
-                0,
-                pressureDrop
-        );
-        outputVals = calcOutputValsRepository.save(outputVals);
+        CalculationOutputValues outputVals = calcOutputValsRepository.save(new CalculationOutputValues(
+                null, totalQ, totalQ, totalP, totalQ + totalP, 0, copEer, 0, 0, pressureDrop));
 
         return new CalculationResultDTO(totalQ, totalP, copEer, flowRate, pressureDrop,
-                customVals.getId(), outputVals.getId());
+                customVals.getId(), outputVals.getId(),
+                0, 0, 0, false, false);
     }
 
-    private double evalPolynomial(double S, double D,
-            double c1, double c2, double c3, double c4, double c5,
-            double c6, double c7, double c8, double c9, double c10) {
-        return c1
-                + c2 * S
-                + c3 * D
-                + c4 * S * S
-                + c5 * S * D
-                + c6 * D * D
-                + c7 * S * S * S
-                + c8 * D * S * S
-                + c9 * S * D * D
-                + c10 * D * D * D;
+    private boolean canUseFaithfulEngine(CompressorRating rating) {
+        return rating != null
+                && rating.isCalculable()
+                && rating.getRefrigerant() != null
+                && rating.getRefrigerant().getCoolpropName() != null
+                && performanceEngine.isAvailable();
+    }
+
+    // Runs the ported FSS3 cycle. Te/Tc come from the unit's approach bridge:
+    //   AW (air-source condenser):
+    //     Cooling: Te = chilled-water outlet − 5, Tc = ambient + 15
+    //     Heating: Te = ambient − 5,             Tc = hot-water outlet + 5
+    //   WW (water-source condenser):
+    //     Cooling & Heating: Te = evaporator-water outlet − 5, Tc = condenser-water outlet + 5
+    // Returns null if the cycle is not valid (caller falls back to the legacy engine).
+    private CalculationResultDTO calculateFaithful(Unit unit, CompressorRating rating, Mod mod,
+                                                   CalculationRequestDTO dto, GlycolCorrection.Factors gf) {
+        double te, tc;
+        if (unit.getUnitType() == org.offitec.osp.domain.enums.UnitTypeEnum.WW) {
+            te = dto.getEvapOut() - 5.0;
+            tc = dto.getCondOut() + 5.0;
+        } else { // AW
+            te = mod == Mod.HEATING ? dto.getAmbient() - 5.0 : dto.getEvapOut() - 5.0;
+            tc = mod == Mod.HEATING ? dto.getCondOut() + 5.0 : dto.getAmbient() + 15.0;
+        }
+
+        double frequency = dto.getFrequencyHz() != null ? dto.getFrequencyHz() : 50.0;
+        double subcooling = dto.getSubcooling() != null ? dto.getSubcooling() : 0.0;
+        CompressorPerformanceEngine.Suction suction = dto.getSuctionGasTemp() != null
+                ? new CompressorPerformanceEngine.SuctionGasTemp(dto.getSuctionGasTemp())
+                : new CompressorPerformanceEngine.Superheat(dto.getSuperheat() != null ? dto.getSuperheat() : 10.0);
+
+        boolean transcritical = "TK".equalsIgnoreCase(rating.getCompressor().getFrascoldType());
+
+        CompressorPerformanceEngine.Result res = performanceEngine.compute(new CompressorPerformanceEngine.Input(
+                rating, rating.getRefrigerant().getCoolpropName(), transcritical,
+                te, tc, suction, subcooling, frequency, null));
+        if (!res.valid()) return null;
+
+        int qty = Math.max(unit.getCompressorQty(), 1);
+        double totalQ = res.coolingCapacityW() * qty / 1000.0 * gf.capacity();   // kW
+        double totalP = res.powerInputW() * qty / 1000.0 * gf.power();           // kW
+        double copEer = totalP > 0 ? totalQ / totalP : 0;
+        double pressureDrop = 50.0 * gf.pressureDrop();
+        double flowRate = totalQ * 860.0 / 5000.0;
+        double massFlow = res.massFlowKgH() * qty;
+        double condenserDuty = res.condenserDutyW() * qty / 1000.0;              // kW
+        double evaporatorDuty = res.evaporatorDutyW() * qty / 1000.0 * gf.capacity();
+
+        CustomCalculationValues customVals = customCalcValsRepository.save(new CustomCalculationValues(
+                null,
+                dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(), dto.getCondIn(), dto.getCondOut(),
+                dto.getGlycolType(), dto.getGlycolPercentage()));
+
+        CalculationOutputValues outputVals = calcOutputValsRepository.save(new CalculationOutputValues(
+                null, totalQ, evaporatorDuty, totalP, condenserDuty, 0, copEer, massFlow, frequency, pressureDrop));
+
+        return new CalculationResultDTO(totalQ, totalP, copEer, flowRate, pressureDrop,
+                customVals.getId(), outputVals.getId(),
+                massFlow, condenserDuty, res.dischargeTempC(), res.withinEnvelope(), true);
     }
 
     private String extractFileName(String url) {
@@ -395,6 +443,24 @@ public class PublicUnitAppService {
 
         for (UnitCardDTO card : cards) {
             card.setIconUrls(byUnit.getOrDefault(card.getId(), List.of()));
+        }
+    }
+
+    // Fills each card's refrigerant code from a SINGLE batched query that derives the code
+    // from the unit's compressor (refrigerant moved to the Compressor). A unit may yield
+    // several rows (one per mode); the first is kept as the representative.
+    private void applyRefrigerants(List<UnitCardDTO> cards) {
+        if (cards.isEmpty()) return;
+        List<Long> unitIds = cards.stream().map(UnitCardDTO::getId).collect(Collectors.toList());
+
+        Map<Long, String> byUnit = unitJpaRepository.findRefrigerantCodesByUnitIds(unitIds).stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> (String) row[1],
+                        (first, dup) -> first));
+
+        for (UnitCardDTO card : cards) {
+            card.setRefrigerant(byUnit.get(card.getId()));
         }
     }
 
@@ -490,7 +556,8 @@ public class PublicUnitAppService {
             }
         }
 
-        if (unit.getRefrigerant() != null) addSpec(specs, "Refrigerant", unit.getRefrigerant().getCode());
+        Refrigerant refrigerant = unitRefrigerant(unit);
+        if (refrigerant != null) addSpec(specs, "Refrigerant", refrigerant.getCode());
 
         // Chassis is a unit-level selection.
         if (unit.getChassis() != null) addSpec(specs, "Chassis Model", unit.getChassis().getModel());
@@ -599,6 +666,14 @@ public class PublicUnitAppService {
             if (ts != null && ts.getCompressorSpecs() != null) return ts.getCompressorSpecs();
         }
         return null;
+    }
+
+    // The unit's refrigerant is now derived from its compressor (the first configured mode's,
+    // shared across modes). Null when no compressor/refrigerant is set.
+    private Refrigerant unitRefrigerant(Unit unit) {
+        CompressorSpecs cs = firstCompressorSpecs(unit);
+        if (cs == null || cs.getCompressor() == null) return null;
+        return cs.getCompressor().getRefrigerant();
     }
 
     private CondenserSpecs firstCondenserSpecs(Unit unit) {

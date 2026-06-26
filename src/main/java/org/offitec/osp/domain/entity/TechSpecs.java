@@ -37,6 +37,13 @@ public class TechSpecs {
     @JoinColumn(name = "compressor_specs_id")
     private CompressorSpecs compressorSpecs;
 
+    // Link to the imported Frascold rating (model + refrigerant). When set, the calculation uses
+    // the faithful CompressorPerformanceEngine; otherwise it falls back to the legacy CompressorSpecs
+    // polynomial. Nullable so existing units (and the old admin flow) keep working.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "compressor_rating_id")
+    private CompressorRating compressorRating;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "condenser_specs_id")
     private CondenserSpecs condenserSpecs;

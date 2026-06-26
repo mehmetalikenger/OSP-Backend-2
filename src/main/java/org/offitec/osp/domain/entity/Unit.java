@@ -54,14 +54,21 @@ public class Unit {
     @Column(name = "expansion_valve_qty")
     private int expansionValveQty;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "refrigerant_id")
-    private Refrigerant refrigerant;
+    // Refrigerant moved to the Compressor (it is a property of the compressor); a unit's
+    // refrigerant is derived from its compressor via UnitDetails -> TechSpecs ->
+    // CompressorSpecs -> Compressor -> Refrigerant.
 
-    // Chassis is a unit-level selection (shared across all modes), like the refrigerant.
+    // Chassis is a unit-level selection (shared across all modes).
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "chassis_id")
     private Chassis chassis;
+
+    // Unit-level compressor selection for heat pumps: cooling and heating share one compressor, so
+    // it's chosen once on the model form and propagated to each mode's TechSpecs. Null for chillers
+    // (which carry the rating on their single mode's TechSpecs).
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "compressor_rating_id")
+    private CompressorRating compressorRating;
 
     @Column(name = "fan_pi")
     private double fanPI;

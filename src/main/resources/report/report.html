@@ -132,24 +132,27 @@
 </div>
 
 <!-- ===== Inputs (Design) ===== -->
+<!-- For a dual-mode (heat pump) report this block is the Cooling point. -->
 <div class="avoid-break">
-    <div class="section-title" th:text="${m.t.inputs}"></div>
+    <div class="section-title" th:text="${m.dualMode ? m.t.coolingInputs : m.t.inputs}"></div>
     <table class="data">
         <tr><td class="label" th:text="${m.t.ambientTemperature}"></td><td class="unit">°C</td><td class="value" th:text="${m.ambient}"></td></tr>
         <tr><td class="label" th:text="${m.t.waterInletTemperature}"></td><td class="unit">°C</td><td class="value" th:text="${m.waterInlet}"></td></tr>
         <tr><td class="label" th:text="${m.t.waterOutletTemperature}"></td><td class="unit">°C</td><td class="value" th:text="${m.waterOutlet}"></td></tr>
+        <tr><td class="label" th:text="${m.t.glycolMixture}"></td><td class="unit"></td><td class="value" th:text="${m.glycolMixture}"></td></tr>
     </table>
 </div>
 
-<!-- ===== Working Limit Graph ===== -->
+<!-- ===== Working Limit Graph (Cooling) ===== -->
 <div class="avoid-break">
-    <div class="section-title" th:text="${m.t.workingLimitGraph}"></div>
+    <div class="section-title" th:text="${m.dualMode ? m.t.coolingWorkingLimitGraph : m.t.workingLimitGraph}"></div>
     <div class="chart" th:utext="${workingLimitSvg}"></div>
 </div>
 
 <!-- ===== Outputs ===== -->
+<!-- For a dual-mode (heat pump) report this block is the Cooling point. -->
 <div class="avoid-break">
-    <div class="section-title" th:text="${m.t.outputs}"></div>
+    <div class="section-title" th:text="${m.dualMode ? m.t.coolingOutputs : m.t.outputs}"></div>
     <table class="data">
         <tr><td class="label" th:text="${m.t.coolingCapacity}"></td><td class="unit">kcal/h</td><td class="value" th:text="${m.coolingCapacityKcalh}"></td></tr>
         <tr><td class="label" th:text="${m.t.coolingCapacity}"></td><td class="unit">kW</td><td class="value" th:text="${m.coolingCapacityKw}"></td></tr>
@@ -183,6 +186,58 @@
     <div class="note" th:text="${m.t.fullLoadNote}"></div>
 </div>
 
+<!-- ===== Heating Inputs (dual-mode heat pump only) ===== -->
+<!-- No glycol row: heating heats the water, so no glycol mixture is used. -->
+<div class="avoid-break" th:if="${m.dualMode}">
+    <div class="section-title" th:text="${m.t.heatingInputs}"></div>
+    <table class="data">
+        <tr><td class="label" th:text="${m.t.ambientTemperature}"></td><td class="unit">°C</td><td class="value" th:text="${m.heatingAmbient}"></td></tr>
+        <tr><td class="label" th:text="${m.t.waterInletTemperature}"></td><td class="unit">°C</td><td class="value" th:text="${m.heatingWaterInlet}"></td></tr>
+        <tr><td class="label" th:text="${m.t.waterOutletTemperature}"></td><td class="unit">°C</td><td class="value" th:text="${m.heatingWaterOutlet}"></td></tr>
+    </table>
+</div>
+
+<!-- ===== Working Limit Graph (Heating, dual-mode only) ===== -->
+<div class="avoid-break" th:if="${m.dualMode}">
+    <div class="section-title" th:text="${m.t.heatingWorkingLimitGraph}"></div>
+    <div class="chart" th:utext="${heatingWorkingLimitSvg}"></div>
+</div>
+
+<!-- ===== Heating Outputs (dual-mode only) ===== -->
+<div class="avoid-break" th:if="${m.dualMode}">
+    <div class="section-title" th:text="${m.t.heatingOutputs}"></div>
+    <table class="data">
+        <tr><td class="label" th:text="${m.t.heatingCapacity}"></td><td class="unit">kcal/h</td><td class="value" th:text="${m.heatingCapacityKcalh}"></td></tr>
+        <tr><td class="label" th:text="${m.t.heatingCapacity}"></td><td class="unit">kW</td><td class="value" th:text="${m.heatingCapacityKw}"></td></tr>
+        <tr><td class="label" th:text="${m.t.inputPower}"></td><td class="unit">kW</td><td class="value" th:text="${m.heatingInputPowerKw}"></td></tr>
+        <tr><td class="label" th:text="${m.t.cop}"></td><td class="unit">W/W</td><td class="value" th:text="${m.heatingCopValue}"></td></tr>
+    </table>
+</div>
+
+<!-- ===== Full Load Heating (dual-mode only) ===== -->
+<div class="avoid-break" th:if="${m.dualMode}">
+    <div class="section-title" th:text="${m.t.fullLoadHeating}"></div>
+    <table class="fl">
+        <tr class="ambients">
+            <th th:text="${m.t.dryBulbAmbientAir}"></th>
+            <td th:each="r : ${m.heatingFullLoad}" th:text="${r.ambient}"></td>
+        </tr>
+        <tr class="values">
+            <td class="rowhead" th:text="${m.t.capacityKw}"></td>
+            <td th:each="r : ${m.heatingFullLoad}" th:text="${r.capacity}"></td>
+        </tr>
+        <tr class="values">
+            <td class="rowhead" th:text="${m.t.inputPowerKw}"></td>
+            <td th:each="r : ${m.heatingFullLoad}" th:text="${r.power}"></td>
+        </tr>
+        <tr class="values">
+            <td class="rowhead" th:text="${m.t.cop} + ' [W/W]'"></td>
+            <td th:each="r : ${m.heatingFullLoad}" th:text="${r.eerCop}"></td>
+        </tr>
+    </table>
+    <div class="note" th:text="${m.t.fullLoadNote}"></div>
+</div>
+
 <!-- ===== Technical Specifications ===== -->
 <div class="avoid-break">
     <div class="section-title" th:text="${m.t.unitTechnicalSpecifications}"></div>
@@ -207,10 +262,16 @@
     </table>
 </div>
 
-<!-- ===== Pressure Drop / Flow Rate Graph ===== -->
+<!-- ===== Pressure Drop / Flow Rate Graph (Cooling) ===== -->
 <div class="avoid-break">
-    <div class="section-title" th:text="${m.t.pressureDropFlowRateGraph}"></div>
+    <div class="section-title" th:text="${m.dualMode ? m.t.coolingPressureGraph : m.t.pressureDropFlowRateGraph}"></div>
     <div class="chart" th:utext="${pressureDropSvg}"></div>
+</div>
+
+<!-- ===== Pressure Drop / Flow Rate Graph (Heating, dual-mode only) ===== -->
+<div class="avoid-break" th:if="${m.dualMode}">
+    <div class="section-title" th:text="${m.t.heatingPressureGraph}"></div>
+    <div class="chart" th:utext="${heatingPressureDropSvg}"></div>
 </div>
 
 <!-- ===== Fans ===== -->

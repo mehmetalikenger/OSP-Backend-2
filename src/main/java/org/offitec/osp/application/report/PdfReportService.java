@@ -72,6 +72,11 @@ public class PdfReportService {
         ctx.setVariable("offitecLogo", offitecLogoDataUri);
         ctx.setVariable("workingLimitSvg", workingLimitSvg.build(model.getWorkingLimit(), model.getT()));
         ctx.setVariable("pressureDropSvg", pressureDropSvg.build(model.getPressureCurve(), model.getT()));
+        // Dual-mode (heat pump) heating charts; empty when not a dual-mode report.
+        ctx.setVariable("heatingWorkingLimitSvg",
+                model.getHeatingWorkingLimit() != null ? workingLimitSvg.build(model.getHeatingWorkingLimit(), model.getT()) : "");
+        ctx.setVariable("heatingPressureDropSvg",
+                model.getHeatingPressureCurve() != null ? pressureDropSvg.build(model.getHeatingPressureCurve(), model.getT()) : "");
 
         // Embed the unit imagery as data URIs (null/failed fetches simply render nothing).
         ctx.setVariable("primaryImage", fetchAsDataUri(model.getPrimaryImageUrl()));

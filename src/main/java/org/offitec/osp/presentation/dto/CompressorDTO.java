@@ -22,4 +22,7 @@ public class CompressorDTO {
     // Maximum Operating Current and Locked Rotor Amperage (A).
     private double moc;
     private double lra;
+
+    // Refrigerant is selected on the compressor (after LRA). Optional.
+    private Long refrigerantId;
 }

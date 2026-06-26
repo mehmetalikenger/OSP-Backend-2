@@ -1,5 +1,6 @@
 package org.offitec.osp.application.report;
 
+import org.offitec.osp.application.service.CompressorPerformanceEngine;
 import org.offitec.osp.application.service.GlycolCorrection;
 import org.offitec.osp.application.service.UnitCalculationEngine;
 import org.offitec.osp.domain.entity.*;
@@ -35,6 +36,8 @@ public class ReportDataAssembler {
 
     // Standard ambient temperatures for the Full Load Cooling table.
     private static final double[] FULL_LOAD_AMBIENTS = {-10, 0, 10, 20, 30, 40};
+    // Heating full-load sweep: -15 °C to 35 °C in 10 °C steps.
+    private static final double[] HEATING_FULL_LOAD_AMBIENTS = {-15, -5, 5, 15, 25, 35};
 
     // Hardcoded constants (no DB field yet).
     private static final double WATER_PRESSURE_BAR = 1.5;
@@ -44,12 +47,68 @@ public class ReportDataAssembler {
     private static final double DEFAULT_MIN_OUTLET = -5, DEFAULT_MAX_OUTLET = 25;
     private static final double DEFAULT_MIN_AMBIENT = -10, DEFAULT_MAX_AMBIENT = 48;
 
+    // Air-to-water heat pump working envelopes (x = water outlet, y = ambient), per mode.
+    // The unit stores only one envelope, so dual-mode (heat pump) reports use these fixed
+    // ranges for the cooling and heating working-limit graphs.
+    private static final double HP_COOL_MIN_OUTLET = -25, HP_COOL_MAX_OUTLET = 20;
+    private static final double HP_COOL_MIN_AMBIENT = -5, HP_COOL_MAX_AMBIENT = 50;
+    private static final double HP_HEAT_MIN_OUTLET = 10, HP_HEAT_MAX_OUTLET = 75;
+    private static final double HP_HEAT_MIN_AMBIENT = -20, HP_HEAT_MAX_AMBIENT = 40;
+
     private final UnitCalculationEngine engine;
+    private final CompressorPerformanceEngine performanceEngine;
     private final ReportMessages messages;
 
-    public ReportDataAssembler(UnitCalculationEngine engine, ReportMessages messages) {
+    public ReportDataAssembler(UnitCalculationEngine engine,
+                               CompressorPerformanceEngine performanceEngine,
+                               ReportMessages messages) {
         this.engine = engine;
+        this.performanceEngine = performanceEngine;
         this.messages = messages;
+    }
+
+    /** One operating point's results, in the report's units (kW). */
+    private record Perf(double capacityKw, double powerKw, double copEer) {}
+
+    /** The faithful-engine operating inputs the user entered (so the PDF matches the calc page). */
+    public record OpInputs(double frequencyHz, double subcooling, Double superheat, Double suctionGasTemp) {
+        public static OpInputs of(Double frequencyHz, Double subcooling, Double superheat, Double suctionGasTemp) {
+            return new OpInputs(frequencyHz != null ? frequencyHz : 50.0,
+                    subcooling != null ? subcooling : 0.0, superheat, suctionGasTemp);
+        }
+    }
+
+    private boolean useFaithful(CompressorRating rating) {
+        return rating != null && performanceEngine.isAvailable() && rating.isCalculable()
+                && rating.getRefrigerant() != null && rating.getRefrigerant().getCoolpropName() != null;
+    }
+
+    // Computes capacity/power/COP for one point. Uses the faithful engine when the unit's TechSpecs
+    // carries an imported rating; otherwise falls back to the legacy CompressorSpecs polynomial.
+    // The report is ambient-based, so the AW approach bridge is used (Cooling: Te=water-5, Tc=amb+15;
+    // Heating: Te=amb-5, Tc=water+5) with the user's frequency / subcooling / superheat.
+    private Perf computePerf(CompressorSpecs cspecs, CompressorRating rating, Unit unit, Mod mod,
+                             double ambient, double waterTemp, OpInputs op) {
+        if (useFaithful(rating)) {
+            double te = mod == Mod.HEATING ? ambient - 5.0 : waterTemp - 5.0;
+            double tc = mod == Mod.HEATING ? waterTemp + 5.0 : ambient + 15.0;
+            CompressorPerformanceEngine.Suction suction = op.suctionGasTemp() != null
+                    ? new CompressorPerformanceEngine.SuctionGasTemp(op.suctionGasTemp())
+                    : new CompressorPerformanceEngine.Superheat(op.superheat() != null ? op.superheat() : 10.0);
+            CompressorPerformanceEngine.Result res = performanceEngine.compute(new CompressorPerformanceEngine.Input(
+                    rating, rating.getRefrigerant().getCoolpropName(),
+                    "TK".equalsIgnoreCase(rating.getCompressor().getFrascoldType()),
+                    te, tc, suction, op.subcooling(), op.frequencyHz(), null));
+            if (res.valid()) {
+                int qty = Math.max(unit.getCompressorQty(), 1);
+                double capKw = res.coolingCapacityW() * qty / 1000.0;
+                double powKw = res.powerInputW() * qty / 1000.0;
+                return new Perf(capKw, powKw, powKw > 0 ? capKw / powKw : 0);
+            }
+        }
+        if (cspecs == null) return new Perf(0, 0, 0);
+        UnitCalculationEngine.Result r = engine.compute(cspecs, unit.getCompressorQty(), mod, ambient, waterTemp);
+        return new Perf(r.capacityKw(), r.powerKw(), r.copEer());
     }
 
     public UnitReportModel assemble(Unit unit, Mod mod,
@@ -57,6 +116,24 @@ public class ReportDataAssembler {
                                     Project project, User user,
                                     String glycolType, Integer glycolPercentage,
                                     Locale locale) {
+        return assemble(unit, mod, ambient, evapIn, evapOut, project, user,
+                glycolType, glycolPercentage, locale, false, 0, 0, 0,
+                OpInputs.of(null, null, null, null), OpInputs.of(null, null, null, null));
+    }
+
+    /**
+     * Dual-mode overload: when {@code dualMode} is true (heat pumps), the {@code ambient/
+     * evapIn/evapOut} arguments are the COOLING point and the {@code heating*} arguments
+     * are the HEATING point, both rendered into one PDF.
+     */
+    public UnitReportModel assemble(Unit unit, Mod mod,
+                                    double ambient, double evapIn, double evapOut,
+                                    Project project, User user,
+                                    String glycolType, Integer glycolPercentage,
+                                    Locale locale,
+                                    boolean dualMode, double heatingAmbient,
+                                    double heatingWaterInlet, double heatingWaterOutlet,
+                                    OpInputs coolingOp, OpInputs heatingOp) {
 
         Map<String, String> t = messages.labels(locale);
         DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy", locale);
@@ -64,11 +141,18 @@ public class ReportDataAssembler {
         UnitDetails details = findDetails(unit, mod);
         TechSpecs ts = details != null ? details.getTechSpecs() : null;
         CompressorSpecs cspecs = ts != null ? ts.getCompressorSpecs() : null;
-        if (cspecs == null) {
-            throw new IllegalStateException("Compressor specs not configured for this unit/mode; cannot build report.");
+        CompressorRating rating = ts != null ? ts.getCompressorRating() : null;
+        if (cspecs == null && rating == null) {
+            throw new IllegalStateException("No compressor configured for this unit/mode; cannot build report.");
         }
+        // Compressor + refrigerant metadata come from whichever selection the unit uses.
+        Compressor compressor = cspecs != null ? cspecs.getCompressor()
+                : (rating != null ? rating.getCompressor() : null);
+        Refrigerant refrigerant = cspecs != null
+                ? (compressor != null ? compressor.getRefrigerant() : null)
+                : (rating != null ? rating.getRefrigerant() : null);
 
-        UnitCalculationEngine.Result design = engine.compute(cspecs, unit.getCompressorQty(), ambient, evapOut);
+        Perf design = computePerf(cspecs, rating, unit, mod, ambient, evapOut, coolingOp);
 
         // A selected glycol mixture scales capacity, power and pressure drop.
         GlycolCorrection.Factors gf = GlycolCorrection.lookup(glycolType, glycolPercentage);
@@ -87,7 +171,7 @@ public class ReportDataAssembler {
         // --- Full load cooling table across the standard ambient range ---
         List<UnitReportModel.FullLoadRow> fullLoad = new ArrayList<>();
         for (double a : FULL_LOAD_AMBIENTS) {
-            UnitCalculationEngine.Result r = engine.compute(cspecs, unit.getCompressorQty(), a, evapOut);
+            Perf r = computePerf(cspecs, rating, unit, mod, a, evapOut, coolingOp);
             double cap = r.capacityKw() * gf.capacity();
             double pow = r.powerKw() * gf.power();
             fullLoad.add(UnitReportModel.FullLoadRow.builder()
@@ -109,8 +193,13 @@ public class ReportDataAssembler {
         double maxAmb = unit.getMaxAmbient();
         if (maxAmb <= minAmb) { minAmb = DEFAULT_MIN_AMBIENT; maxAmb = DEFAULT_MAX_AMBIENT; }
 
+        // Heat-pump reports use the fixed cooling envelope for the (cooling) working-limit graph.
+        if (dualMode) {
+            minOut = HP_COOL_MIN_OUTLET; maxOut = HP_COOL_MAX_OUTLET;
+            minAmb = HP_COOL_MIN_AMBIENT; maxAmb = HP_COOL_MAX_AMBIENT;
+        }
+
         // Electrical data from the compressor: MOC is per-compressor * compressor qty; LRA as-is.
-        Compressor compressor = cspecs.getCompressor();
         double mocPer = compressor != null && compressor.getMoc() != null ? compressor.getMoc() : 0.0;
         double lraVal = compressor != null && compressor.getLra() != null ? compressor.getLra() : 0.0;
         double totalMoc = mocPer * Math.max(unit.getCompressorQty(), 1);
@@ -134,8 +223,81 @@ public class ReportDataAssembler {
             if (primaryImageUrl.isEmpty() && firstImage != null) primaryImageUrl = firstImage;
         }
 
+        // Glycol mixture display for the Inputs table (shown on every report).
+        String glycolMixture;
+        if (glycolType == null || glycolType.isBlank() || glycolPercentage == null) {
+            glycolMixture = t.getOrDefault("glycolNone", "None");
+        } else {
+            glycolMixture = glycolType + " " + glycolPercentage + "%";
+        }
+
+        // Heat-pump dual-mode: compute the HEATING operating point from its own mode's specs.
+        String hAmbient = "", hWaterIn = "", hWaterOut = "";
+        String hCapKcalh = "", hCapKw = "", hPowKw = "", hCop = "";
+        UnitReportModel.WorkingLimit heatingWL = null;
+        UnitReportModel.PressureCurve heatingPC = null;
+        List<UnitReportModel.FullLoadRow> heatingFullLoad = new ArrayList<>();
+        if (dualMode) {
+            UnitDetails hDetails = findDetails(unit, Mod.HEATING);
+            TechSpecs hts = hDetails != null ? hDetails.getTechSpecs() : null;
+            CompressorSpecs hcs = hts != null ? hts.getCompressorSpecs() : null;
+            CompressorRating hrating = hts != null ? hts.getCompressorRating() : null;
+            if (hcs != null || hrating != null) {
+                Perf hr = computePerf(hcs, hrating, unit, Mod.HEATING, heatingAmbient, heatingWaterOutlet, heatingOp);
+                // Heating heats the water, so no glycol correction is applied to heating values.
+                double hCap = hr.capacityKw();
+                double hPow = hr.powerKw();
+                double hCopVal = hPow > 0 ? hCap / hPow : hr.copEer();
+
+                // Heating full-load table across the heating ambient range (held at the entered
+                // heating water outlet), same shape as the cooling table.
+                for (double a : HEATING_FULL_LOAD_AMBIENTS) {
+                    Perf fr = computePerf(hcs, hrating, unit, Mod.HEATING, a, heatingWaterOutlet, heatingOp);
+                    double cap = fr.capacityKw();
+                    double pow = fr.powerKw();
+                    heatingFullLoad.add(UnitReportModel.FullLoadRow.builder()
+                            .ambient(fmt1(a))
+                            .capacity(fmt4(cap))
+                            .power(fmt4(pow))
+                            .eerCop(fmt4(pow > 0 ? cap / pow : fr.copEer()))
+                            .build());
+                }
+                hAmbient = fmt1(heatingAmbient);
+                hWaterIn = fmt1(heatingWaterInlet);
+                hWaterOut = fmt1(heatingWaterOutlet);
+                hCapKcalh = fmtThousands(hCap * 860.0);
+                hCapKw = fmt4(hCap);
+                hPowKw = fmt4(hPow);
+                hCop = fmt4(hCopVal);
+
+                // Heating charts: reuse the unit's working envelope, plot the heating point;
+                // heating flow rate is derived from the heating capacity like the cooling one.
+                double hFlow = hCap * 860.0 / 5000.0;
+                heatingWL = UnitReportModel.WorkingLimit.builder()
+                        .minWaterOutlet(HP_HEAT_MIN_OUTLET).maxWaterOutlet(HP_HEAT_MAX_OUTLET)
+                        .minAmbient(HP_HEAT_MIN_AMBIENT).maxAmbient(HP_HEAT_MAX_AMBIENT)
+                        .pointWaterOutlet(heatingWaterOutlet).pointAmbient(heatingAmbient)
+                        .build();
+                heatingPC = UnitReportModel.PressureCurve.builder()
+                        .designFlowRate(hFlow).designPressureDrop(PRESSURE_DROP_KPA)
+                        .build();
+            }
+        }
+
         return UnitReportModel.builder()
                 .t(t)
+                .glycolMixture(glycolMixture)
+                .dualMode(dualMode)
+                .heatingAmbient(hAmbient)
+                .heatingWaterInlet(hWaterIn)
+                .heatingWaterOutlet(hWaterOut)
+                .heatingCapacityKcalh(hCapKcalh)
+                .heatingCapacityKw(hCapKw)
+                .heatingInputPowerKw(hPowKw)
+                .heatingCopValue(hCop)
+                .heatingWorkingLimit(heatingWL)
+                .heatingPressureCurve(heatingPC)
+                .heatingFullLoad(heatingFullLoad)
                 .primaryImageUrl(primaryImageUrl)
                 .drawingUrls(drawingUrls)
                 // Project information (project values win; otherwise fall back to the user's account)
@@ -162,9 +324,10 @@ public class ReportDataAssembler {
                 .eerCopValue(fmt4(outCop))
                 .fullLoad(fullLoad)
                 // Technical specifications
-                .refrigerantCode(unit.getRefrigerant() != null ? nz(unit.getRefrigerant().getCode()) : "-")
-                .compressorModel(compressorField(cspecs, true))
-                .compressorBrand(compressorField(cspecs, false))
+                // Refrigerant is a property of the compressor now (derived from cspecs).
+                .refrigerantCode(refrigerant != null ? nz(refrigerant.getCode()) : "-")
+                .compressorModel(dash(compressor != null ? compressor.getModel() : null))
+                .compressorBrand(dash(compressor != null ? compressor.getBrand() : null))
                 .compressorQty(String.valueOf(unit.getCompressorQty()))
                 .circuitQty(String.valueOf(unit.getCompressorQty())) // circuit qty := compressor qty
                 .condenserType(condenserType(ts))

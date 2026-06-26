@@ -11,8 +11,11 @@ public class UnitTechSpecsDTO {
     public double capacity;
     public double maxCapacity;
 
-    @NotNull(message = "Compressor must be selected.")
+    // Legacy detailed-coefficient compressor (optional now). For AW units the admin instead selects
+    // an imported Frascold rating (model + refrigerant) via compressorRatingId.
     public Long compressorSpecsId;
+    // Imported Frascold rating id (model + refrigerant). When set, the faithful engine is used.
+    public Long compressorRatingId;
     public int compressorQty;
 
     @NotNull(message = "Condenser must be selected.")
@@ -31,9 +34,6 @@ public class UnitTechSpecsDTO {
 
     // Optional for chillers (used by heat pumps in heating mode)
     public Long fourWayReversingValveSpecsId;
-
-    @NotNull(message = "Refrigerant must be selected.")
-    public Long refrigerantId;
 
     public double condenserRequiredDuty;
     public double quietCondenserRequiredDuty;

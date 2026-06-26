@@ -53,7 +53,10 @@ public class ReportAppService {
 
         UnitReportModel model = assembler.assemble(
                 unit, mod, dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(), null, user,
-                dto.getGlycolType(), dto.getGlycolPercentage(), ReportMessages.toLocale(dto.getLanguage()));
+                dto.getGlycolType(), dto.getGlycolPercentage(), ReportMessages.toLocale(dto.getLanguage()),
+                dto.isDualMode(), dto.getHeatingAmbient(), dto.getHeatingWaterInlet(), dto.getHeatingWaterOutlet(),
+                ReportDataAssembler.OpInputs.of(dto.getFrequencyHz(), dto.getSubcooling(), dto.getSuperheat(), dto.getSuctionGasTemp()),
+                ReportDataAssembler.OpInputs.of(dto.getHeatingFrequencyHz(), dto.getHeatingSubcooling(), dto.getHeatingSuperheat(), dto.getHeatingSuctionGasTemp()));
 
         return pdfReportService.render(model);
     }
