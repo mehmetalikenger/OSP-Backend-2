@@ -64,7 +64,7 @@ public class ReportDataAssembler {
     }
 
     /** One operating point's results, in the report's units (kW). */
-    private record Perf(double capacityKw, double powerKw, double copEer) {}
+    private record Perf(double capacityKw, double powerKw, double copEer, double massFlowKgH) {}
 
     /** The faithful-engine operating inputs the user entered (so the PDF matches the calc page). */
     public record OpInputs(double frequencyHz, double subcooling, Double superheat, Double suctionGasTemp) {
@@ -116,10 +116,10 @@ public class ReportDataAssembler {
                 // Heating output is the condenser duty (heat delivered to the water); cooling is the
                 // evaporator/refrigerating capacity.
                 double capKw = mod == Mod.HEATING ? res.condenserDutyW() * qty / 1000.0 : coolKw;
-                return new Perf(capKw, powKw, powKw > 0 ? capKw / powKw : 0);
+                return new Perf(capKw, powKw, powKw > 0 ? capKw / powKw : 0, res.massFlowKgH() * qty);
             }
         }
-        return new Perf(0, 0, 0);
+        return new Perf(0, 0, 0, 0);
     }
 
     public UnitReportModel assemble(Unit unit, Mod mod,
@@ -378,8 +378,25 @@ public class ReportDataAssembler {
                 .orElse(null);
     }
 
+    /**
+     * Overlays the current project/user info onto a previously rendered report snapshot, leaving every
+     * computed value (and the original printed date) untouched. Used by report regeneration so a
+     * project-info edit re-renders the same numbers without re-running the engine.
+     */
+    public UnitReportModel withProjectInfo(UnitReportModel base, Project project, User user) {
+        return base.toBuilder()
+                .projectName(project != null ? project.getName() : "")
+                .responsiblePerson(user != null ? nz(user.getUsername()) : "")
+                .email(user != null ? nz(user.getEmail()) : "")
+                .phone(formatPhone(pick(project != null ? project.getPhone() : null, user != null ? user.getPhone() : null)))
+                .country(pick(project != null ? project.getCountry() : null, user != null ? user.getCountry() : null))
+                .city(pick(project != null ? project.getCity() : null, user != null ? user.getCity() : null))
+                .address(pick(project != null ? project.getAddress() : null, user != null ? user.getAddress() : null))
+                .build();
+    }
+
     /** One operating point's capacity/power/COP, in kW (no glycol correction applied). */
-    public record OperatingPoint(double capacityKw, double powerKw, double copEer) {}
+    public record OperatingPoint(double capacityKw, double powerKw, double copEer, double massFlowKgH) {}
 
     /**
      * Computes a single operating point for a mode the same way the PDF does, so the values
@@ -391,7 +408,7 @@ public class ReportDataAssembler {
         TechSpecs ts = details != null ? details.getTechSpecs() : null;
         CompressorRating rating = ts != null ? ts.getCompressorRating() : null;
         Perf p = computePerf(rating, unit, mod, ambient, waterTemp, op);
-        return new OperatingPoint(p.capacityKw(), p.powerKw(), p.copEer());
+        return new OperatingPoint(p.capacityKw(), p.powerKw(), p.copEer(), p.massFlowKgH());
     }
 
     private String condenserType(TechSpecs ts) {

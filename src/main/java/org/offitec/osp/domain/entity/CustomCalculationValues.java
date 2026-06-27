@@ -41,4 +41,19 @@ public class CustomCalculationValues {
 
     @Column(name = "mixture_ratio")
     private Integer mixtureRatio;
+
+    // Faithful-engine operating inputs, persisted so report regeneration recalculates the exact same
+    // point instead of falling back to defaults (50 Hz / 0 K subcooling / 10 K superheat). Nullable so
+    // rows created before these columns existed still hydrate.
+    @Column(name = "frequency_hz")
+    private Double frequencyHz;
+
+    @Column(name = "subcooling")
+    private Double subcooling;
+
+    @Column(name = "superheat")
+    private Double superheat;
+
+    @Column(name = "suction_gas_temp")
+    private Double suctionGasTemp;
 }

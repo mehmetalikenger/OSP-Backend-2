@@ -1,5 +1,6 @@
 package org.offitec.osp.application.report;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.offitec.osp.domain.entity.Project;
 import org.offitec.osp.domain.entity.Unit;
 import org.offitec.osp.domain.entity.User;
@@ -30,6 +31,10 @@ public class ReportAppService {
     private final ReportDataAssembler assembler;
     private final PdfReportService pdfReportService;
     private final S3Service s3Service;
+    // Self-contained mapper for report snapshots: we own both the serialize and deserialize sides and
+    // the model is plain strings/doubles, so it needs no app-wide ObjectMapper bean (Spring Boot doesn't
+    // expose one here) and no custom configuration.
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ReportAppService(UnitJpaRepository unitRepository,
                             UserRepository userRepository,
@@ -42,6 +47,9 @@ public class ReportAppService {
         this.pdfReportService = pdfReportService;
         this.s3Service = s3Service;
     }
+
+    /** A stored report: the uploaded PDF URL plus the serialized view model used to regenerate it. */
+    public record StoredReport(String pdfUrl, String modelJson) {}
 
     @Transactional(readOnly = true)
     public byte[] generate(Long unitId, ReportRequestDTO dto) {
@@ -67,11 +75,15 @@ public class ReportAppService {
      * runs in the caller's transaction so the URL can be saved on the ProjectDetails row.
      * The project (when present) supplies the contact/address block printed on the report.
      */
-    public String renderAndStore(Unit unit, Mod mod, double ambient, double evapIn, double evapOut, Project project, User user,
-                                 String glycolType, Integer glycolPercentage, java.util.Locale locale) {
+    public StoredReport renderAndStore(Unit unit, Mod mod, double ambient, double evapIn, double evapOut, Project project, User user,
+                                       String glycolType, Integer glycolPercentage, java.util.Locale locale,
+                                       ReportDataAssembler.OpInputs op) {
+        // Single-mode report: assemble() drives the computation from coolingOp regardless of mode, so
+        // pass the saved op there (dualMode=false). Keeps the chiller PDF on the user's frequency etc.
         UnitReportModel model = assembler.assemble(unit, mod, ambient, evapIn, evapOut, project, user,
-                glycolType, glycolPercentage, locale);
-        return render(unit, model);
+                glycolType, glycolPercentage, locale,
+                false, 0, 0, 0, op, ReportDataAssembler.OpInputs.of(null, null, null, null));
+        return new StoredReport(render(unit, model), toJson(model));
     }
 
     /**
@@ -79,14 +91,37 @@ public class ReportAppService {
      * operating points and stores it. The primary inputs are the COOLING point; the heating* args
      * are the HEATING point. Used by the add-to-project flow and report regeneration.
      */
-    public String renderAndStore(Unit unit, double ambient, double evapIn, double evapOut, Project project, User user,
-                                 String glycolType, Integer glycolPercentage, java.util.Locale locale,
-                                 double heatingAmbient, double heatingWaterInlet, double heatingWaterOutlet,
-                                 ReportDataAssembler.OpInputs coolingOp, ReportDataAssembler.OpInputs heatingOp) {
+    public StoredReport renderAndStore(Unit unit, double ambient, double evapIn, double evapOut, Project project, User user,
+                                       String glycolType, Integer glycolPercentage, java.util.Locale locale,
+                                       double heatingAmbient, double heatingWaterInlet, double heatingWaterOutlet,
+                                       ReportDataAssembler.OpInputs coolingOp, ReportDataAssembler.OpInputs heatingOp) {
         UnitReportModel model = assembler.assemble(unit, Mod.COOLING, ambient, evapIn, evapOut, project, user,
                 glycolType, glycolPercentage, locale,
                 true, heatingAmbient, heatingWaterInlet, heatingWaterOutlet, coolingOp, heatingOp);
+        return new StoredReport(render(unit, model), toJson(model));
+    }
+
+    /** Renders an already-built (e.g. snapshot-overlaid) model and stores it, returning the new URL. */
+    public String storeModel(Unit unit, UnitReportModel model) {
         return render(unit, model);
+    }
+
+    /** Serializes a report view model for snapshotting on the ProjectDetails row. */
+    public String toJson(UnitReportModel model) {
+        try {
+            return objectMapper.writeValueAsString(model);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize report snapshot", e);
+        }
+    }
+
+    /** Reconstructs a report view model from a stored snapshot. */
+    public UnitReportModel fromJson(String json) {
+        try {
+            return objectMapper.readValue(json, UnitReportModel.class);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException("Failed to read report snapshot", e);
+        }
     }
 
     private String render(Unit unit, UnitReportModel model) {

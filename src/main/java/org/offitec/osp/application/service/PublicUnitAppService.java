@@ -9,8 +9,6 @@ import org.offitec.osp.domain.enums.UnitCategory;
 import org.offitec.osp.domain.enums.UnitTypeEnum;
 import org.offitec.osp.domain.exception.UnitDoesntExistException;
 import org.offitec.osp.infrastructure.config.CacheConfig;
-import org.offitec.osp.infrastructure.repository.CalculationOutputValuesRepository;
-import org.offitec.osp.infrastructure.repository.CustomCalculationValuesRepository;
 import org.offitec.osp.infrastructure.repository.SavedUnitRepository;
 import org.offitec.osp.infrastructure.repository.UnitDetailsRepository;
 import org.offitec.osp.infrastructure.repository.UnitJpaRepository;
@@ -47,23 +45,17 @@ public class PublicUnitAppService {
 
     private final UnitJpaRepository unitJpaRepository;
     private final UnitDetailsRepository unitDetailsRepository;
-    private final CustomCalculationValuesRepository customCalcValsRepository;
-    private final CalculationOutputValuesRepository calcOutputValsRepository;
     private final SavedUnitRepository savedUnitRepository;
     private final UserRepository userRepository;
     private final CompressorPerformanceEngine performanceEngine;
 
     public PublicUnitAppService(UnitJpaRepository unitJpaRepository,
                                 UnitDetailsRepository unitDetailsRepository,
-                                CustomCalculationValuesRepository customCalcValsRepository,
-                                CalculationOutputValuesRepository calcOutputValsRepository,
                                 SavedUnitRepository savedUnitRepository,
                                 UserRepository userRepository,
                                 CompressorPerformanceEngine performanceEngine) {
         this.unitJpaRepository = unitJpaRepository;
         this.unitDetailsRepository = unitDetailsRepository;
-        this.customCalcValsRepository = customCalcValsRepository;
-        this.calcOutputValsRepository = calcOutputValsRepository;
         this.savedUnitRepository = savedUnitRepository;
         this.userRepository = userRepository;
         this.performanceEngine = performanceEngine;
@@ -355,16 +347,11 @@ public class PublicUnitAppService {
         double pressureDrop = 50.0 * gf.pressureDrop();
         double flowRate = headlineCapacity * 860.0 / 5000.0;
 
-        CustomCalculationValues customVals = customCalcValsRepository.save(new CustomCalculationValues(
-                null, mod,
-                dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(), dto.getCondIn(), dto.getCondOut(),
-                dto.getGlycolType(), dto.getGlycolPercentage()));
-
-        CalculationOutputValues outputVals = calcOutputValsRepository.save(new CalculationOutputValues(
-                null, mod, refrigeratingKw, evaporatorDuty, totalP, condenserDuty, 0, copEer, massFlow, frequency, pressureDrop));
-
+        // Preview only: the result is returned to the browser (and is enough to render/download the
+        // PDF) but is NOT persisted. Rows are written to custom_calc_vals / calc_output_vals only when
+        // the user adds the result to a project (ProjectAppService.addUnit). Hence the null id fields.
         return new CalculationResultDTO(headlineCapacity, totalP, copEer, flowRate, pressureDrop,
-                customVals.getId(), outputVals.getId(),
+                null, null,
                 massFlow, condenserDuty, evaporatorDuty, res.dischargeTempC(), res.withinEnvelope(), true);
     }
 

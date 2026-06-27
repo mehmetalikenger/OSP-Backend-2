@@ -2,6 +2,7 @@ package org.offitec.osp.application.report;
 
 import lombok.Builder;
 import lombok.Getter;
+import lombok.extern.jackson.Jacksonized;
 
 import java.util.List;
 import java.util.Map;
@@ -14,7 +15,8 @@ import java.util.Map;
  * live in {@link #workingLimit} and {@link #pressureCurve}.
  */
 @Getter
-@Builder
+@Builder(toBuilder = true)
+@Jacksonized
 public class UnitReportModel {
 
     // --- Localized labels (key -> translated text) used by the template ('t' for brevity). ---
@@ -108,6 +110,7 @@ public class UnitReportModel {
 
     @Getter
     @Builder
+    @Jacksonized
     public static class FullLoadRow {
         private final String ambient;   // "-10.0"
         private final String capacity;  // "142"
@@ -118,6 +121,7 @@ public class UnitReportModel {
     /** Safe-area rectangle bounds + the plotted operating point for the working-limit graph. */
     @Getter
     @Builder
+    @Jacksonized
     public static class WorkingLimit {
         private final double minWaterOutlet;
         private final double maxWaterOutlet;
@@ -130,6 +134,7 @@ public class UnitReportModel {
     /** Design flow rate + design pressure drop; the curve is synthesized as PD = PDd*(Q/Qd)^2. */
     @Getter
     @Builder
+    @Jacksonized
     public static class PressureCurve {
         private final double designFlowRate;     // Qd, m³/h
         private final double designPressureDrop;  // PDd, kPa

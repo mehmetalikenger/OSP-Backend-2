@@ -139,16 +139,17 @@ public class ProjectAppService {
         // drives the PDF and is stored so a later regeneration keeps the same language.
         String language = dto.getLanguage() == null ? "en" : dto.getLanguage();
         java.util.Locale locale = org.offitec.osp.application.report.ReportMessages.toLocale(language);
-        String pdfUrl = dualMode
+        ReportAppService.StoredReport report = dualMode
                 ? reportAppService.renderAndStore(unit, dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(),
                         project, project.getUser(), dto.getGlycolType(), dto.getGlycolPercentage(), locale,
                         dto.getHeatingAmbient(), dto.getHeatingWaterInlet(), dto.getHeatingWaterOutlet(), coolingOp, heatingOp)
                 : reportAppService.renderAndStore(unit, Mod.COOLING, dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(),
-                        project, project.getUser(), dto.getGlycolType(), dto.getGlycolPercentage(), locale);
+                        project, project.getUser(), dto.getGlycolType(), dto.getGlycolPercentage(), locale, coolingOp);
 
-        pd.setLanguage(language);                // remembered so the report keeps its language
-        pd.setPdfUrl(pdfUrl);
-        projectDetailsRepository.save(pd);       // cascade ALL persists the value rows
+        pd.setLanguage(language);                       // remembered so the report keeps its language
+        pd.setPdfUrl(report.pdfUrl());
+        pd.setReportModelJson(report.modelJson());      // snapshot so regeneration never recomputes
+        projectDetailsRepository.save(pd);              // cascade ALL persists the value rows
 
         return toDTO(project, projectDetailsRepository.findByProjectId(project.getId()));
     }
@@ -164,19 +165,25 @@ public class ProjectAppService {
         double powKw = pt.powerKw() * gf.power();
         double cop = powKw > 0 ? capKw / powKw : pt.copEer();
         double pressureDrop = 50.0 * gf.pressureDrop();
+        // Evaporator (cold) and condenser (hot) sides via the energy balance condenser = evaporator + power.
+        // Heating's headline (capKw) is already the condenser duty, so the cold side is capKw − powKw;
+        // cooling's headline is the evaporator capacity, so the condenser side is capKw + powKw.
+        double evapKw = mod == Mod.HEATING ? capKw - powKw : capKw;
+        double condKw = mod == Mod.HEATING ? capKw : capKw + powKw;
 
         CustomCalculationValues in = new CustomCalculationValues(
-                null, mod, ambient, evapIn, evapOut, condIn, condOut, glycolType, glycolPercentage);
+                null, mod, ambient, evapIn, evapOut, condIn, condOut, glycolType, glycolPercentage,
+                op.frequencyHz(), op.subcooling(), op.superheat(), op.suctionGasTemp());
         CalculationOutputValues out = new CalculationOutputValues(
                 null, mod,
-                capKw,            // refrigerantCapacity (the mode's headline capacity)
-                capKw,            // evaporatorCapacity
+                capKw,            // refrigerantCapacity (the mode's headline capacity, shown in the project DTO)
+                evapKw,           // evaporatorCapacity (cold side)
                 powKw,            // powerInput
-                capKw + powKw,    // condenserCapacity
+                condKw,           // condenserCapacity (heat rejected; no double-count for heating)
                 0,                // current
                 cop,              // copEer
-                0,                // massFlow
-                0,                // operatingFrequency
+                pt.massFlowKgH(), // massFlow
+                op.frequencyHz(), // operatingFrequency
                 pressureDrop);    // pressureDrop (base 50 * glycol factor)
 
         pd.getCustomCalculationValues().add(in);
@@ -234,34 +241,49 @@ public class ProjectAppService {
     // Heat-pump details (a COOLING + a HEATING row) regenerate the single dual-mode PDF.
     private void regenerateReport(Project project, ProjectDetails d) {
         Unit unit = d.getUnit();
-        if (unit == null || d.getCustomCalculationValues().isEmpty()) return;
-
-        // Split the stored inputs by mode (a null mod is treated as the cooling/primary row).
-        CustomCalculationValues cool = null, heat = null;
-        for (CustomCalculationValues in : d.getCustomCalculationValues()) {
-            if (in.getMod() == Mod.HEATING) heat = in; else cool = in;
-        }
-        if (cool == null) cool = heat; // safety: a heating-only detail still renders
+        if (unit == null) return;
 
         String oldUrl = d.getPdfUrl();
-        java.util.Locale locale = org.offitec.osp.application.report.ReportMessages.toLocale(d.getLanguage());
-        // Reuse the stored glycol selection and language so the regenerated report recalculates with
-        // the same correction and language. The faithful-engine op inputs aren't persisted, so they
-        // fall back to defaults here (50 Hz / 0 K subcooling / 10 K superheat).
         String newUrl;
-        if (heat != null && cool != null && cool != heat) {
-            newUrl = reportAppService.renderAndStore(unit,
-                    cool.getAmbient(), cool.getEvapIn(), cool.getEvapOut(), project, project.getUser(),
-                    cool.getMixtureType(), cool.getMixtureRatio(), locale,
-                    heat.getAmbient(), heat.getCondIn(), heat.getCondOut(),
-                    ReportDataAssembler.OpInputs.of(null, null, null, null),
-                    ReportDataAssembler.OpInputs.of(null, null, null, null));
+
+        String snapshot = d.getReportModelJson();
+        if (snapshot != null && !snapshot.isBlank()) {
+            // Snapshot path: overlay ONLY the project-info block onto the stored report and re-render.
+            // No engine recomputation, so every computed value (and the original printed date) is kept.
+            var updated = assembler.withProjectInfo(reportAppService.fromJson(snapshot), project, project.getUser());
+            newUrl = reportAppService.storeModel(unit, updated);
+            d.setReportModelJson(reportAppService.toJson(updated)); // refresh the snapshot's project info
         } else {
-            Mod mod = cool.getMod() == null ? Mod.COOLING : cool.getMod();
-            newUrl = reportAppService.renderAndStore(unit, mod,
-                    cool.getAmbient(), cool.getEvapIn(), cool.getEvapOut(), project, project.getUser(),
-                    cool.getMixtureType(), cool.getMixtureRatio(), locale);
+            // Legacy fallback (rows saved before snapshots existed): recompute from the stored inputs,
+            // reusing the persisted op inputs, then capture a snapshot so the NEXT regeneration is drift-free.
+            if (d.getCustomCalculationValues().isEmpty()) return;
+            CustomCalculationValues cool = null, heat = null;
+            for (CustomCalculationValues in : d.getCustomCalculationValues()) {
+                if (in.getMod() == Mod.HEATING) heat = in; else cool = in;
+            }
+            if (cool == null) cool = heat; // a heating-only detail still renders
+            java.util.Locale locale = org.offitec.osp.application.report.ReportMessages.toLocale(d.getLanguage());
+            ReportDataAssembler.OpInputs coolOp = ReportDataAssembler.OpInputs.of(
+                    cool.getFrequencyHz(), cool.getSubcooling(), cool.getSuperheat(), cool.getSuctionGasTemp());
+            ReportAppService.StoredReport report;
+            if (heat != null && cool != heat) {
+                ReportDataAssembler.OpInputs heatOp = ReportDataAssembler.OpInputs.of(
+                        heat.getFrequencyHz(), heat.getSubcooling(), heat.getSuperheat(), heat.getSuctionGasTemp());
+                report = reportAppService.renderAndStore(unit,
+                        cool.getAmbient(), cool.getEvapIn(), cool.getEvapOut(), project, project.getUser(),
+                        cool.getMixtureType(), cool.getMixtureRatio(), locale,
+                        heat.getAmbient(), heat.getCondIn(), heat.getCondOut(),
+                        coolOp, heatOp);
+            } else {
+                Mod mod = cool.getMod() == null ? Mod.COOLING : cool.getMod();
+                report = reportAppService.renderAndStore(unit, mod,
+                        cool.getAmbient(), cool.getEvapIn(), cool.getEvapOut(), project, project.getUser(),
+                        cool.getMixtureType(), cool.getMixtureRatio(), locale, coolOp);
+            }
+            newUrl = report.pdfUrl();
+            d.setReportModelJson(report.modelJson());
         }
+
         d.setPdfUrl(newUrl);
         projectDetailsRepository.save(d);
 
