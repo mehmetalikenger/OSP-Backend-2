@@ -101,14 +101,20 @@ public class ReportDataAssembler {
                     te, tc, suction, op.subcooling(), op.frequencyHz(), null));
             if (res.valid()) {
                 int qty = Math.max(unit.getCompressorQty(), 1);
-                double capKw = res.coolingCapacityW() * qty / 1000.0;
+                double coolKw = res.coolingCapacityW() * qty / 1000.0;
                 double powKw = res.powerInputW() * qty / 1000.0;
+                // Heating output is the condenser duty (heat delivered to the water); cooling is the
+                // evaporator/refrigerating capacity.
+                double capKw = mod == Mod.HEATING ? res.condenserDutyW() * qty / 1000.0 : coolKw;
                 return new Perf(capKw, powKw, powKw > 0 ? capKw / powKw : 0);
             }
         }
         if (cspecs == null) return new Perf(0, 0, 0);
         UnitCalculationEngine.Result r = engine.compute(cspecs, unit.getCompressorQty(), mod, ambient, waterTemp);
-        return new Perf(r.capacityKw(), r.powerKw(), r.copEer());
+        // Legacy engine has no condenser duty; derive it from the energy balance (capacity + power).
+        double capKw = mod == Mod.HEATING ? r.capacityKw() + r.powerKw() : r.capacityKw();
+        double powKw = r.powerKw();
+        return new Perf(capKw, powKw, powKw > 0 ? capKw / powKw : r.copEer());
     }
 
     public UnitReportModel assemble(Unit unit, Mod mod,
@@ -370,6 +376,23 @@ public class ReportDataAssembler {
                 .filter(d -> d.getMod() == mod)
                 .findFirst()
                 .orElse(null);
+    }
+
+    /** One operating point's capacity/power/COP, in kW (no glycol correction applied). */
+    public record OperatingPoint(double capacityKw, double powerKw, double copEer) {}
+
+    /**
+     * Computes a single operating point for a mode the same way the PDF does, so the values
+     * persisted on a ProjectDetails match the report. Heating returns the condenser duty as the
+     * capacity (see {@link #computePerf}). Glycol correction is left to the caller (cooling only).
+     */
+    public OperatingPoint computeOperatingPoint(Unit unit, Mod mod, double ambient, double waterTemp, OpInputs op) {
+        UnitDetails details = findDetails(unit, mod);
+        TechSpecs ts = details != null ? details.getTechSpecs() : null;
+        CompressorSpecs cspecs = ts != null ? ts.getCompressorSpecs() : null;
+        CompressorRating rating = ts != null ? ts.getCompressorRating() : null;
+        Perf p = computePerf(cspecs, rating, unit, mod, ambient, waterTemp, op);
+        return new OperatingPoint(p.capacityKw(), p.powerKw(), p.copEer());
     }
 
     private String compressorField(CompressorSpecs cspecs, boolean model) {

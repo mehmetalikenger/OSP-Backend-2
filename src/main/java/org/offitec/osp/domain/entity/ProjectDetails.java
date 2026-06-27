@@ -2,7 +2,9 @@ package org.offitec.osp.domain.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.offitec.osp.domain.enums.Mod;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "project_details")
@@ -28,19 +30,16 @@ public class ProjectDetails {
     @JoinColumn(name = "product_id", nullable = false)
     private Unit unit;
 
-    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    @JoinColumn(name = "custom_calc_vals_id", nullable = false)
-    private CustomCalculationValues customCalculationValues;
+    // One row per operating mode: a heat pump holds a COOLING and a HEATING row (both rendered
+    // into the single dual-mode PDF on this detail); a chiller holds a single COOLING row. The FK
+    // lives on the child table (project_details_id), so this detail owns the collection.
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JoinColumn(name = "project_details_id")
+    private List<CustomCalculationValues> customCalculationValues = new ArrayList<>();
 
-    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    @JoinColumn(name = "calc_output_vals_id")
-    private CalculationOutputValues calculationOutputValues;
-
-    // The operating mode this calculation was run in (COOLING/HEATING). Stored so the
-    // report can be regenerated with the exact same inputs when project info changes.
-    @Enumerated(EnumType.STRING)
-    @Column(name = "mod")
-    private Mod mod;
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JoinColumn(name = "project_details_id")
+    private List<CalculationOutputValues> calculationOutputValues = new ArrayList<>();
 
     // Language the stored report PDF was rendered in ("en"/"de"). Remembered so the
     // report regenerates in the same language when the project's info changes.

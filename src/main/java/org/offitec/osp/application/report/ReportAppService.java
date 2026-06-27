@@ -71,8 +71,26 @@ public class ReportAppService {
                                  String glycolType, Integer glycolPercentage, java.util.Locale locale) {
         UnitReportModel model = assembler.assemble(unit, mod, ambient, evapIn, evapOut, project, user,
                 glycolType, glycolPercentage, locale);
-        byte[] pdf = pdfReportService.render(model);
+        return render(unit, model);
+    }
 
+    /**
+     * Dual-mode variant for heat pumps: renders one PDF covering both the COOLING and HEATING
+     * operating points and stores it. The primary inputs are the COOLING point; the heating* args
+     * are the HEATING point. Used by the add-to-project flow and report regeneration.
+     */
+    public String renderAndStore(Unit unit, double ambient, double evapIn, double evapOut, Project project, User user,
+                                 String glycolType, Integer glycolPercentage, java.util.Locale locale,
+                                 double heatingAmbient, double heatingWaterInlet, double heatingWaterOutlet,
+                                 ReportDataAssembler.OpInputs coolingOp, ReportDataAssembler.OpInputs heatingOp) {
+        UnitReportModel model = assembler.assemble(unit, Mod.COOLING, ambient, evapIn, evapOut, project, user,
+                glycolType, glycolPercentage, locale,
+                true, heatingAmbient, heatingWaterInlet, heatingWaterOutlet, coolingOp, heatingOp);
+        return render(unit, model);
+    }
+
+    private String render(Unit unit, UnitReportModel model) {
+        byte[] pdf = pdfReportService.render(model);
         String key = "unit-" + unit.getId() + "/" + java.util.UUID.randomUUID() + ".pdf";
         return s3Service.uploadReport(key, pdf);
     }

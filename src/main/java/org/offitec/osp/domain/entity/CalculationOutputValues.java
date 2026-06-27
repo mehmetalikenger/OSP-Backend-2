@@ -2,6 +2,7 @@ package org.offitec.osp.domain.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.offitec.osp.domain.enums.Mod;
 
 @Entity
 @Table(name = "calc_output_vals")
@@ -15,6 +16,11 @@ public class CalculationOutputValues {
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "calc_output_vals_seq_gen")
     @SequenceGenerator(name = "calc_output_vals_seq_gen", sequenceName = "osp_calc_output_vals_sequence", allocationSize = 50)
     private Long id;
+
+    // The operating mode these outputs belong to (COOLING/HEATING) — see CustomCalculationValues.mod.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mod")
+    private Mod mod;
 
     @Column(name = "refrigerant_capacity")
     private double refrigerantCapacity;

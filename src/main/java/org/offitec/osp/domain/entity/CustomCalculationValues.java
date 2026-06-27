@@ -2,6 +2,7 @@ package org.offitec.osp.domain.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.offitec.osp.domain.enums.Mod;
 
 @Entity
 @Table(name = "custom_calc_vals")
@@ -15,6 +16,12 @@ public class CustomCalculationValues {
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "custom_calc_val_seq_gen")
     @SequenceGenerator(name = "custom_calc_val_seq_gen", sequenceName = "osp_custom_calc_val_sequence", allocationSize = 50)
     private Long id;
+
+    // The operating mode these inputs belong to. A heat pump's ProjectDetails holds one row per
+    // mode (COOLING + HEATING); a chiller holds a single COOLING row.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mod")
+    private Mod mod;
 
     @Column(nullable = false)
     private double ambient;

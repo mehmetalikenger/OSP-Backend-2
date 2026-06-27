@@ -1,8 +1,10 @@
 package org.offitec.osp.application.service;
 
 import org.offitec.osp.application.report.ReportAppService;
+import org.offitec.osp.application.report.ReportDataAssembler;
 import org.offitec.osp.domain.entity.*;
 import org.offitec.osp.domain.enums.Mod;
+import org.offitec.osp.domain.enums.UnitCategory;
 import org.offitec.osp.domain.exception.UnitDoesntExistException;
 import org.offitec.osp.infrastructure.repository.*;
 import org.offitec.osp.infrastructure.storage.S3Service;
@@ -36,26 +38,23 @@ public class ProjectAppService {
     private final ProjectRepository projectRepository;
     private final ProjectDetailsRepository projectDetailsRepository;
     private final UnitJpaRepository unitRepository;
-    private final UnitDetailsRepository unitDetailsRepository;
     private final UserRepository userRepository;
-    private final UnitCalculationEngine engine;
+    private final ReportDataAssembler assembler;
     private final ReportAppService reportAppService;
     private final S3Service s3Service;
 
     public ProjectAppService(ProjectRepository projectRepository,
                              ProjectDetailsRepository projectDetailsRepository,
                              UnitJpaRepository unitRepository,
-                             UnitDetailsRepository unitDetailsRepository,
                              UserRepository userRepository,
-                             UnitCalculationEngine engine,
+                             ReportDataAssembler assembler,
                              ReportAppService reportAppService,
                              S3Service s3Service) {
         this.projectRepository = projectRepository;
         this.projectDetailsRepository = projectDetailsRepository;
         this.unitRepository = unitRepository;
-        this.unitDetailsRepository = unitDetailsRepository;
         this.userRepository = userRepository;
-        this.engine = engine;
+        this.assembler = assembler;
         this.reportAppService = reportAppService;
         this.s3Service = s3Service;
     }
@@ -109,32 +108,68 @@ public class ProjectAppService {
         // once (e.g. evaluated under different operating conditions), each a distinct
         // ProjectDetails row with its own inputs, outputs, and report.
 
-        Mod mod = Mod.valueOf(dto.getMod() == null ? "COOLING" : dto.getMod().trim().toUpperCase());
-        UnitDetails details = unitDetailsRepository.findByUnitIdAndMod(unit.getId(), mod)
-                .orElseThrow(() -> new IllegalStateException("Unit details not found for mod: " + mod));
-        TechSpecs ts = details.getTechSpecs();
-        if (ts == null || ts.getCompressorSpecs() == null) {
-            throw new IllegalStateException("Compressor specs not configured for this unit.");
+        // Heat pumps are dual-mode: one detail holds both a COOLING and a HEATING row and renders
+        // a single PDF covering both. Chillers hold a single COOLING row. The DTO flag must also be
+        // set (the form sends the heating inputs) — otherwise we'd compute heating from zeros.
+        boolean dualMode = unit.getCategory() == UnitCategory.HEAT_PUMP && dto.isDualMode();
+
+        ProjectDetails pd = new ProjectDetails();
+        pd.setProject(project);
+        pd.setUnit(unit);
+
+        // Cooling point (always present). Glycol correction applies on the chilled-water side.
+        ReportDataAssembler.OpInputs coolingOp = ReportDataAssembler.OpInputs.of(
+                dto.getFrequencyHz(), dto.getSubcooling(), dto.getSuperheat(), dto.getSuctionGasTemp());
+        GlycolCorrection.Factors coolGf = GlycolCorrection.lookup(dto.getGlycolType(), dto.getGlycolPercentage());
+        addModeRow(pd, unit, Mod.COOLING,
+                dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(), 0, 0,
+                dto.getEvapOut(), coolingOp, coolGf, dto.getGlycolType(), dto.getGlycolPercentage());
+
+        // Heating point (heat pumps only). Heating heats the water — no glycol correction.
+        ReportDataAssembler.OpInputs heatingOp = ReportDataAssembler.OpInputs.of(
+                dto.getHeatingFrequencyHz(), dto.getHeatingSubcooling(), dto.getHeatingSuperheat(), dto.getHeatingSuctionGasTemp());
+        if (dualMode) {
+            addModeRow(pd, unit, Mod.HEATING,
+                    dto.getHeatingAmbient(), 0, 0, dto.getHeatingWaterInlet(), dto.getHeatingWaterOutlet(),
+                    dto.getHeatingWaterOutlet(), heatingOp, GlycolCorrection.Factors.NONE, null, null);
         }
 
-        UnitCalculationEngine.Result r =
-                engine.compute(ts.getCompressorSpecs(), unit.getCompressorQty(), dto.getAmbient(), dto.getEvapOut());
+        // Adding to a project is the only flow that persists a report: render it (dual-mode for heat
+        // pumps), store it in R2, and keep the URL on the ProjectDetails row. The chosen language
+        // drives the PDF and is stored so a later regeneration keeps the same language.
+        String language = dto.getLanguage() == null ? "en" : dto.getLanguage();
+        java.util.Locale locale = org.offitec.osp.application.report.ReportMessages.toLocale(language);
+        String pdfUrl = dualMode
+                ? reportAppService.renderAndStore(unit, dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(),
+                        project, project.getUser(), dto.getGlycolType(), dto.getGlycolPercentage(), locale,
+                        dto.getHeatingAmbient(), dto.getHeatingWaterInlet(), dto.getHeatingWaterOutlet(), coolingOp, heatingOp)
+                : reportAppService.renderAndStore(unit, Mod.COOLING, dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(),
+                        project, project.getUser(), dto.getGlycolType(), dto.getGlycolPercentage(), locale);
 
-        // Apply the glycol mixture correction (if any) to the persisted outputs.
-        GlycolCorrection.Factors gf = GlycolCorrection.lookup(dto.getGlycolType(), dto.getGlycolPercentage());
-        double capKw = r.capacityKw() * gf.capacity();
-        double powKw = r.powerKw() * gf.power();
-        double cop = powKw > 0 ? capKw / powKw : r.copEer();
+        pd.setLanguage(language);                // remembered so the report keeps its language
+        pd.setPdfUrl(pdfUrl);
+        projectDetailsRepository.save(pd);       // cascade ALL persists the value rows
 
+        return toDTO(project, projectDetailsRepository.findByProjectId(project.getId()));
+    }
+
+    // Computes one mode's operating point the same way the PDF does and appends its input/output
+    // rows to the detail. Glycol correction is applied here (NONE for heating).
+    private void addModeRow(ProjectDetails pd, Unit unit, Mod mod,
+                            double ambient, double evapIn, double evapOut, double condIn, double condOut,
+                            double waterTemp, ReportDataAssembler.OpInputs op, GlycolCorrection.Factors gf,
+                            String glycolType, Integer glycolPercentage) {
+        ReportDataAssembler.OperatingPoint pt = assembler.computeOperatingPoint(unit, mod, ambient, waterTemp, op);
+        double capKw = pt.capacityKw() * gf.capacity();   // heating: condenser duty; cooling: refrigerating capacity
+        double powKw = pt.powerKw() * gf.power();
+        double cop = powKw > 0 ? capKw / powKw : pt.copEer();
         double pressureDrop = 50.0 * gf.pressureDrop();
 
-        CustomCalculationValues inputs = new CustomCalculationValues(
-                null, dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(), dto.getCondIn(), dto.getCondOut(),
-                dto.getGlycolType(), dto.getGlycolPercentage());
-
-        CalculationOutputValues outputs = new CalculationOutputValues(
-                null,
-                capKw,            // refrigerantCapacity
+        CustomCalculationValues in = new CustomCalculationValues(
+                null, mod, ambient, evapIn, evapOut, condIn, condOut, glycolType, glycolPercentage);
+        CalculationOutputValues out = new CalculationOutputValues(
+                null, mod,
+                capKw,            // refrigerantCapacity (the mode's headline capacity)
                 capKw,            // evaporatorCapacity
                 powKw,            // powerInput
                 capKw + powKw,    // condenserCapacity
@@ -144,26 +179,8 @@ public class ProjectAppService {
                 0,                // operatingFrequency
                 pressureDrop);    // pressureDrop (base 50 * glycol factor)
 
-        // Adding to a project is the only flow that persists a report: render it,
-        // store it in R2, and keep the URL on the ProjectDetails row. The chosen language
-        // drives the PDF and is stored so a later regeneration keeps the same language.
-        String language = dto.getLanguage() == null ? "en" : dto.getLanguage();
-        String pdfUrl = reportAppService.renderAndStore(
-                unit, mod, dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(), project, project.getUser(),
-                dto.getGlycolType(), dto.getGlycolPercentage(),
-                org.offitec.osp.application.report.ReportMessages.toLocale(language));
-
-        ProjectDetails pd = new ProjectDetails();
-        pd.setProject(project);
-        pd.setUnit(unit);
-        pd.setCustomCalculationValues(inputs);   // cascade ALL persists these
-        pd.setCalculationOutputValues(outputs);
-        pd.setMod(mod);                          // remembered so the report can be regenerated
-        pd.setLanguage(language);                // remembered so the report keeps its language
-        pd.setPdfUrl(pdfUrl);
-        projectDetailsRepository.save(pd);
-
-        return toDTO(project, projectDetailsRepository.findByProjectId(project.getId()));
+        pd.getCustomCalculationValues().add(in);
+        pd.getCalculationOutputValues().add(out);
     }
 
     /**
@@ -212,21 +229,39 @@ public class ProjectAppService {
         projectRepository.delete(project);
     }
 
-    // Re-renders one detail's report with the project's current info, reusing the saved
+    // Re-renders one detail's report with the project's current info, reusing the saved per-mode
     // inputs, and swaps the stored PDF (deleting the old object only after the new one is up).
+    // Heat-pump details (a COOLING + a HEATING row) regenerate the single dual-mode PDF.
     private void regenerateReport(Project project, ProjectDetails d) {
         Unit unit = d.getUnit();
-        CustomCalculationValues in = d.getCustomCalculationValues();
-        if (unit == null || in == null) return;
+        if (unit == null || d.getCustomCalculationValues().isEmpty()) return;
 
-        Mod mod = d.getMod() == null ? Mod.COOLING : d.getMod();
+        // Split the stored inputs by mode (a null mod is treated as the cooling/primary row).
+        CustomCalculationValues cool = null, heat = null;
+        for (CustomCalculationValues in : d.getCustomCalculationValues()) {
+            if (in.getMod() == Mod.HEATING) heat = in; else cool = in;
+        }
+        if (cool == null) cool = heat; // safety: a heating-only detail still renders
+
         String oldUrl = d.getPdfUrl();
-        // Reuse the stored glycol selection and language so the regenerated report recalculates
-        // with the same correction and renders in the same language the user originally chose.
-        String newUrl = reportAppService.renderAndStore(
-                unit, mod, in.getAmbient(), in.getEvapIn(), in.getEvapOut(), project, project.getUser(),
-                in.getMixtureType(), in.getMixtureRatio(),
-                org.offitec.osp.application.report.ReportMessages.toLocale(d.getLanguage()));
+        java.util.Locale locale = org.offitec.osp.application.report.ReportMessages.toLocale(d.getLanguage());
+        // Reuse the stored glycol selection and language so the regenerated report recalculates with
+        // the same correction and language. The faithful-engine op inputs aren't persisted, so they
+        // fall back to defaults here (50 Hz / 0 K subcooling / 10 K superheat).
+        String newUrl;
+        if (heat != null && cool != null && cool != heat) {
+            newUrl = reportAppService.renderAndStore(unit,
+                    cool.getAmbient(), cool.getEvapIn(), cool.getEvapOut(), project, project.getUser(),
+                    cool.getMixtureType(), cool.getMixtureRatio(), locale,
+                    heat.getAmbient(), heat.getCondIn(), heat.getCondOut(),
+                    ReportDataAssembler.OpInputs.of(null, null, null, null),
+                    ReportDataAssembler.OpInputs.of(null, null, null, null));
+        } else {
+            Mod mod = cool.getMod() == null ? Mod.COOLING : cool.getMod();
+            newUrl = reportAppService.renderAndStore(unit, mod,
+                    cool.getAmbient(), cool.getEvapIn(), cool.getEvapOut(), project, project.getUser(),
+                    cool.getMixtureType(), cool.getMixtureRatio(), locale);
+        }
         d.setPdfUrl(newUrl);
         projectDetailsRepository.save(d);
 
@@ -272,21 +307,33 @@ public class ProjectAppService {
 
         List<ProjectDTO.ProjectDetailDTO> detailDTOs = new ArrayList<>();
         for (ProjectDetails d : details) {
-            CustomCalculationValues in = d.getCustomCalculationValues();
-            CalculationOutputValues out = d.getCalculationOutputValues();
             Unit u = d.getUnit();
+
+            // Pair each mode's inputs with its outputs by mod, then emit one ModeResultDTO per mode
+            // (COOLING first). A heat pump yields two; a chiller one.
+            Map<Mod, CalculationOutputValues> outByMod = new HashMap<>();
+            for (CalculationOutputValues o : d.getCalculationOutputValues()) outByMod.put(o.getMod(), o);
+
+            List<ProjectDTO.ModeResultDTO> modes = new ArrayList<>();
+            d.getCustomCalculationValues().stream()
+                    .sorted((a, b) -> Integer.compare(modOrder(a.getMod()), modOrder(b.getMod())))
+                    .forEach(in -> {
+                        CalculationOutputValues out = outByMod.get(in.getMod());
+                        modes.add(new ProjectDTO.ModeResultDTO(
+                                in.getMod() != null ? in.getMod().name() : null,
+                                in.getAmbient(), in.getEvapIn(), in.getEvapOut(), in.getCondIn(), in.getCondOut(),
+                                out != null ? out.getRefrigerantCapacity() : 0,
+                                out != null ? out.getPowerInput() : 0,
+                                out != null ? out.getCopEer() : 0));
+                    });
+
             detailDTOs.add(new ProjectDTO.ProjectDetailDTO(
                     d.getId(),
                     u != null ? u.getId() : null,
                     u != null ? u.getName() : null,
                     u != null ? u.getModel() : null,
                     u != null ? imageByUnit.get(u.getId()) : null,
-                    in != null ? in.getAmbient() : 0,
-                    in != null ? in.getEvapIn() : 0,
-                    in != null ? in.getEvapOut() : 0,
-                    out != null ? out.getRefrigerantCapacity() : 0,
-                    out != null ? out.getPowerInput() : 0,
-                    out != null ? out.getCopEer() : 0,
+                    modes,
                     d.getPdfUrl()));
         }
         return new ProjectDTO(
@@ -298,6 +345,13 @@ public class ProjectAppService {
 
     private String fmtDate(LocalDateTime dt) {
         return dt == null ? null : dt.format(PROJECT_DATE_FMT);
+    }
+
+    // Orders modes for display: COOLING first, then HEATING, then anything unset.
+    private static int modOrder(Mod mod) {
+        if (mod == Mod.COOLING) return 0;
+        if (mod == Mod.HEATING) return 1;
+        return 2;
     }
 
     // Maps each detail's unit to its primary image URL (the same image the catalog/saved

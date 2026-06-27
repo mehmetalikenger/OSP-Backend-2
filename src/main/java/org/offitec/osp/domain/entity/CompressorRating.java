@@ -95,6 +95,13 @@ public class CompressorRating {
     @Column(name = "envelope", columnDefinition = "jsonb")
     private double[][] envelope;
 
+    // Admin-entered nominal (capacity, power input) per operating mode (COOLING + HEATING). The
+    // coefficients above drive the calculation engine; these are the rated duties used for listing,
+    // matching and the unit's per-mode capacity. FK lives on the child table.
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JoinColumn(name = "compressor_rating_id")
+    private java.util.List<CompressorModeCapacity> modeCapacities = new java.util.ArrayList<>();
+
     // False when this rating's refrigerant has no CoolProp mapping yet — imported for completeness
     // but the engine will refuse to compute it until the property mapping exists.
     @Column(name = "calculable", nullable = false)

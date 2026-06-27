@@ -23,6 +23,24 @@ public class AddToProjectDTO {
     private double condIn;
     private double condOut;
 
+    // Faithful-engine operating inputs for the COOLING point — must match what the calc page sent
+    // so the persisted outputs and PDF reproduce the same numbers. Optional (defaults 50 / 0 / 10).
+    private Double frequencyHz;
+    private Double subcooling;
+    private Double superheat;
+    private Double suctionGasTemp;
+
+    // Heat pumps store both modes under one ProjectDetails and render a single dual-mode PDF.
+    // When dualMode is true the inputs above are the COOLING point and these are the HEATING point.
+    private boolean dualMode;
+    private double heatingAmbient;
+    private double heatingWaterInlet;
+    private double heatingWaterOutlet;
+    private Double heatingFrequencyHz;
+    private Double heatingSubcooling;
+    private Double heatingSuperheat;
+    private Double heatingSuctionGasTemp;
+
     // Optional glycol mixture correction (see GlycolCorrection).
     private String glycolType;
     private Integer glycolPercentage;
