@@ -51,7 +51,6 @@ public class PublicUnitAppService {
     private final CalculationOutputValuesRepository calcOutputValsRepository;
     private final SavedUnitRepository savedUnitRepository;
     private final UserRepository userRepository;
-    private final UnitCalculationEngine calculationEngine;
     private final CompressorPerformanceEngine performanceEngine;
 
     public PublicUnitAppService(UnitJpaRepository unitJpaRepository,
@@ -60,7 +59,6 @@ public class PublicUnitAppService {
                                 CalculationOutputValuesRepository calcOutputValsRepository,
                                 SavedUnitRepository savedUnitRepository,
                                 UserRepository userRepository,
-                                UnitCalculationEngine calculationEngine,
                                 CompressorPerformanceEngine performanceEngine) {
         this.unitJpaRepository = unitJpaRepository;
         this.unitDetailsRepository = unitDetailsRepository;
@@ -68,7 +66,6 @@ public class PublicUnitAppService {
         this.calcOutputValsRepository = calcOutputValsRepository;
         this.savedUnitRepository = savedUnitRepository;
         this.userRepository = userRepository;
-        this.calculationEngine = calculationEngine;
         this.performanceEngine = performanceEngine;
     }
 
@@ -120,16 +117,15 @@ public class PublicUnitAppService {
             UnitDetails cooling = unit.getUnitDetails().stream()
                     .filter(d -> d.getMod() == Mod.COOLING
                             && d.getTechSpecs() != null
-                            && d.getTechSpecs().getCompressorSpecs() != null)
+                            && d.getTechSpecs().getCompressorRating() != null)
                     .findFirst()
                     .orElse(null);
             if (cooling == null) continue;
 
-            double capacityKw = calculationEngine.compute(
-                    cooling.getTechSpecs().getCompressorSpecs(),
-                    unit.getCompressorQty(),
-                    dto.getAmbient(),
-                    dto.getEvapOut()).capacityKw();
+            double capacityKw = coolingCapacityKw(unit,
+                    cooling.getTechSpecs().getCompressorRating(),
+                    dto.getAmbient(), dto.getEvapOut());
+            if (capacityKw < 0) continue; // engine couldn't rate this point
 
             if (capacityKw >= lo && capacityKw <= hi) matchedIds.add(unit.getId());
         }
@@ -283,61 +279,34 @@ public class PublicUnitAppService {
                 ? GlycolCorrection.Factors.NONE
                 : GlycolCorrection.lookup(dto.getGlycolType(), dto.getGlycolPercentage());
 
-        // Prefer the faithful FSS3 engine when the unit is linked to an imported, calculable rating.
+        // All calculation goes through the faithful engine (Frascold cycle or Copeland polynomial),
+        // driven by the unit's CompressorRating.
         CompressorRating rating = techSpecs.getCompressorRating();
-        if (canUseFaithfulEngine(rating)) {
-            CalculationResultDTO faithful = calculateFaithful(unit, rating, mod, dto, gf);
-            if (faithful != null) return faithful;
-            // fall through to the legacy engine if the operating point produced no valid cycle
+        if (rating == null) {
+            throw new RuntimeException("This unit has no compressor rating configured; cannot calculate.");
         }
-
-        CompressorSpecs specs = techSpecs.getCompressorSpecs();
-        if (specs == null) throw new RuntimeException("Compressor specs not configured for this unit.");
-
-        // Heating is rated on the hot-water (condenser) outlet; cooling on the chilled-water
-        // (evaporator) outlet. The engine derives the polynomial variables from the mode and
-        // picks the ISCR/Copeland trivariate formula when applicable.
-        double leavingWaterTemp = mod == Mod.HEATING ? dto.getCondOut() : dto.getEvapOut();
-        UnitCalculationEngine.Result design = calculationEngine.compute(
-                specs, unit.getCompressorQty(), mod, dto.getAmbient(), leavingWaterTemp);
-
-        // A selected glycol mixture scales capacity, power and pressure drop by its factors.
-        // Heating heats the water (no glycol needed), so the correction is skipped for heating.
-        double refrigeratingKw = design.capacityKw() * gf.capacity();   // evaporator/cooling capacity
-        double totalP = design.powerKw() * gf.power();
-        double condenserDuty = refrigeratingKw + totalP;                // heat rejected at the condenser
-
-        // In heating the useful output is the heat delivered at the condenser (= evaporator capacity
-        // + compressor power); in cooling it's the evaporator/refrigerating capacity. COP/EER and the
-        // water flow rate follow whichever is the headline figure.
-        double headlineCapacity = mod == Mod.HEATING ? condenserDuty : refrigeratingKw;
-        double copEer = totalP > 0 ? headlineCapacity / totalP : 0;
-
-        double pressureDrop = 50.0 * gf.pressureDrop();
-
-        // Flow rate derived from the headline capacity, matching the report assembler so the
-        // calculation page and the PDF show the same value: capacity(kW) * 860 / 5000 (m³/h).
-        double flowRate = headlineCapacity * 860.0 / 5000.0;
-
-        CustomCalculationValues customVals = customCalcValsRepository.save(new CustomCalculationValues(
-                null, mod,
-                dto.getAmbient(), dto.getEvapIn(), dto.getEvapOut(), dto.getCondIn(), dto.getCondOut(),
-                dto.getGlycolType(), dto.getGlycolPercentage()));
-
-        CalculationOutputValues outputVals = calcOutputValsRepository.save(new CalculationOutputValues(
-                null, mod, refrigeratingKw, refrigeratingKw, totalP, condenserDuty, 0, copEer, 0, 0, pressureDrop));
-
-        return new CalculationResultDTO(headlineCapacity, totalP, copEer, flowRate, pressureDrop,
-                customVals.getId(), outputVals.getId(),
-                0, mod == Mod.HEATING ? condenserDuty : 0, 0, false, false);
+        CalculationResultDTO faithful = calculateFaithful(unit, rating, mod, dto, gf);
+        if (faithful == null) {
+            throw new RuntimeException("Calculation produced no valid result for the given operating point.");
+        }
+        return faithful;
     }
 
-    private boolean canUseFaithfulEngine(CompressorRating rating) {
-        return rating != null
-                && rating.isCalculable()
-                && rating.getRefrigerant() != null
-                && rating.getRefrigerant().getCoolpropName() != null
-                && performanceEngine.isAvailable();
+    // Cooling capacity (kW, scaled by compressor qty) for a rating at the products-page match point,
+    // using the AW approach bridge (Te = evapOut − 5, Tc = ambient + 15). Returns -1 if the engine
+    // cannot rate the point.
+    private double coolingCapacityKw(Unit unit, CompressorRating rating, double ambient, double evapOut) {
+        double te = evapOut - 5.0;
+        double tc = ambient + 15.0;
+        String fluid = rating.getRefrigerant() != null ? rating.getRefrigerant().getCoolpropName() : null;
+        boolean transcritical = rating.getCompressor() != null
+                && "TK".equalsIgnoreCase(rating.getCompressor().getFrascoldType());
+        CompressorPerformanceEngine.Result res = performanceEngine.compute(new CompressorPerformanceEngine.Input(
+                rating, fluid, transcritical, te, tc,
+                new CompressorPerformanceEngine.Superheat(10.0), 0.0, 50.0, null, null));
+        if (!res.valid()) return -1.0;
+        int qty = Math.max(unit.getCompressorQty(), 1);
+        return res.coolingCapacityW() * qty / 1000.0;
     }
 
     // Runs the ported FSS3 cycle. Te/Tc come from the unit's approach bridge:
@@ -366,9 +335,10 @@ public class PublicUnitAppService {
 
         boolean transcritical = "TK".equalsIgnoreCase(rating.getCompressor().getFrascoldType());
 
+        String fluid = rating.getRefrigerant() != null ? rating.getRefrigerant().getCoolpropName() : null;
         CompressorPerformanceEngine.Result res = performanceEngine.compute(new CompressorPerformanceEngine.Input(
-                rating, rating.getRefrigerant().getCoolpropName(), transcritical,
-                te, tc, suction, subcooling, frequency, null));
+                rating, fluid, transcritical,
+                te, tc, suction, subcooling, frequency, null, dto.getRpm()));
         if (!res.valid()) return null;
 
         int qty = Math.max(unit.getCompressorQty(), 1);
@@ -395,7 +365,7 @@ public class PublicUnitAppService {
 
         return new CalculationResultDTO(headlineCapacity, totalP, copEer, flowRate, pressureDrop,
                 customVals.getId(), outputVals.getId(),
-                massFlow, condenserDuty, res.dischargeTempC(), res.withinEnvelope(), true);
+                massFlow, condenserDuty, evaporatorDuty, res.dischargeTempC(), res.withinEnvelope(), true);
     }
 
     private String extractFileName(String url) {
@@ -480,13 +450,22 @@ public class PublicUnitAppService {
         if (unit.getUnitDetails() == null) return null;
         List<ModeCapacity> modes = new ArrayList<>();
         for (UnitDetails d : unit.getUnitDetails()) {
-            if (d.getTechSpecs() != null) {
-                Double max = d.getTechSpecs().getMaxCapacity();
-                modes.add(new ModeCapacity(d.getMod(), d.getTechSpecs().getCapacity(),
-                        max != null ? max : 0.0));
+            if (d.getTechSpecs() == null) continue;
+            CompressorModeCapacity mc = modeCapacity(d.getTechSpecs().getCompressorRating(), d.getMod());
+            if (mc != null) {
+                modes.add(new ModeCapacity(d.getMod(), mc.getCapacity(),
+                        mc.getMaxCapacity() != null ? mc.getMaxCapacity() : 0.0));
             }
         }
         return formatCapacity(modes);
+    }
+
+    // The rating's nominal capacity for one mode (null when none is recorded for that mode yet).
+    private CompressorModeCapacity modeCapacity(CompressorRating rating, Mod mod) {
+        if (rating == null || rating.getModeCapacities() == null) return null;
+        return rating.getModeCapacities().stream()
+                .filter(mc -> mc.getMod() == mod)
+                .findFirst().orElse(null);
     }
 
     // Single mode -> "38.0 - 45.0 kW". Multiple modes -> "45.0 - 52.0 kW (Heating), ..."
@@ -573,13 +552,15 @@ public class PublicUnitAppService {
         if (unit.getChassis() != null) addSpec(specs, "Chassis Model", unit.getChassis().getModel());
 
         // Component brand/model/type/capacity, taken from the first configured mode (shared across modes).
-        CompressorSpecs compressorSpecs = firstCompressorSpecs(unit);
-        if (compressorSpecs != null && compressorSpecs.getCompressor() != null) {
-            Compressor compressor = compressorSpecs.getCompressor();
+        CompressorRating compressorRating = firstCompressorRating(unit);
+        if (compressorRating != null && compressorRating.getCompressor() != null) {
+            Compressor compressor = compressorRating.getCompressor();
             addSpec(specs, "Compressor Brand", compressor.getBrand());
             addSpec(specs, "Compressor Model", compressor.getModel());
             if (compressor.getType() != null) addSpec(specs, "Compressor Type", compressor.getType().name());
-            addSpec(specs, "Compressor Capacity", capacityKw(compressorSpecs.getCapacity()));
+            CompressorModeCapacity firstCap = compressorRating.getModeCapacities() == null
+                    ? null : compressorRating.getModeCapacities().stream().findFirst().orElse(null);
+            if (firstCap != null) addSpec(specs, "Compressor Capacity", capacityKw(firstCap.getCapacity()));
             // MOC = compressor qty * per-compressor MOC; LRA shown as-is.
             if (compressor.getMoc() != null && compressor.getMoc() > 0) {
                 double totalMoc = compressor.getMoc() * Math.max(unit.getCompressorQty(), 1);
@@ -669,21 +650,20 @@ public class PublicUnitAppService {
 
     // --- Component lookups (return the first occurrence across the unit's modes) ---
 
-    private CompressorSpecs firstCompressorSpecs(Unit unit) {
+    private CompressorRating firstCompressorRating(Unit unit) {
         if (unit.getUnitDetails() == null) return null;
         for (UnitDetails d : unit.getUnitDetails()) {
             TechSpecs ts = d.getTechSpecs();
-            if (ts != null && ts.getCompressorSpecs() != null) return ts.getCompressorSpecs();
+            if (ts != null && ts.getCompressorRating() != null) return ts.getCompressorRating();
         }
         return null;
     }
 
-    // The unit's refrigerant is now derived from its compressor (the first configured mode's,
-    // shared across modes). Null when no compressor/refrigerant is set.
+    // The unit's refrigerant is derived from its compressor rating (the first configured mode's,
+    // shared across modes). Null when no rating is set.
     private Refrigerant unitRefrigerant(Unit unit) {
-        CompressorSpecs cs = firstCompressorSpecs(unit);
-        if (cs == null || cs.getCompressor() == null) return null;
-        return cs.getCompressor().getRefrigerant();
+        CompressorRating rating = firstCompressorRating(unit);
+        return rating != null ? rating.getRefrigerant() : null;
     }
 
     private CondenserSpecs firstCondenserSpecs(Unit unit) {

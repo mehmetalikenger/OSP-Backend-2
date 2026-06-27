@@ -36,6 +36,10 @@ public class CalculationRequestDTO {
     // Absolute suction-gas temperature (°C). When set, overrides superheat.
     private Double suctionGasTemp;
 
+    // Compressor speed (rpm). Used by the Copeland trivariate polynomial path; ignored by Frascold.
+    // Defaults to the rating's max speed (or 3000) when not supplied.
+    private Double rpm;
+
     // Optional glycol mixture correction. type e.g. "Ethylene Glycol" / "Propylene Glycol",
     // percentage 5..50. When set, capacity/power are scaled by the correction factors.
     private String glycolType;

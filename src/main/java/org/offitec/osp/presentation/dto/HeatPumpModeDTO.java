@@ -10,13 +10,10 @@ public class HeatPumpModeDTO {
 
     private String mod;
 
-    private double capacity;
-    private double maxCapacity;
     private double copErr;
     private double condenserRequiredDuty;
     private double quietCondenserRequiredDuty;
 
-    private Long compressorSpecsId;
     private Long compressorRatingId;
     private Long condenserSpecsId;
     private Long evaporatorSpecsId;

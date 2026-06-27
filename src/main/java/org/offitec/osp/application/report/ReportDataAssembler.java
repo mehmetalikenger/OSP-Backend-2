@@ -2,7 +2,6 @@ package org.offitec.osp.application.report;
 
 import org.offitec.osp.application.service.CompressorPerformanceEngine;
 import org.offitec.osp.application.service.GlycolCorrection;
-import org.offitec.osp.application.service.UnitCalculationEngine;
 import org.offitec.osp.domain.entity.*;
 import org.offitec.osp.domain.enums.AssetType;
 import org.offitec.osp.domain.enums.Mod;
@@ -55,14 +54,11 @@ public class ReportDataAssembler {
     private static final double HP_HEAT_MIN_OUTLET = 10, HP_HEAT_MAX_OUTLET = 75;
     private static final double HP_HEAT_MIN_AMBIENT = -20, HP_HEAT_MAX_AMBIENT = 40;
 
-    private final UnitCalculationEngine engine;
     private final CompressorPerformanceEngine performanceEngine;
     private final ReportMessages messages;
 
-    public ReportDataAssembler(UnitCalculationEngine engine,
-                               CompressorPerformanceEngine performanceEngine,
+    public ReportDataAssembler(CompressorPerformanceEngine performanceEngine,
                                ReportMessages messages) {
-        this.engine = engine;
         this.performanceEngine = performanceEngine;
         this.messages = messages;
     }
@@ -78,16 +74,28 @@ public class ReportDataAssembler {
         }
     }
 
+    // Brand-driven Copeland detection (direct polynomial path needs no CoolProp).
+    private static boolean isCopeland(CompressorRating r) {
+        if (r == null || r.getCompressor() == null) return false;
+        String b = r.getCompressor().getBrand();
+        return b != null && b.trim().toLowerCase().startsWith("copel");
+    }
+
     private boolean useFaithful(CompressorRating rating) {
-        return rating != null && performanceEngine.isAvailable() && rating.isCalculable()
+        if (rating == null) return false;
+        // Copeland uses the direct polynomial; CoolProp only needed for the optional subcooling bump.
+        if (isCopeland(rating)) {
+            return rating.getCapCoeffs() != null && rating.getPowerCoeffs() != null;
+        }
+        return performanceEngine.isAvailable() && rating.isCalculable()
                 && rating.getRefrigerant() != null && rating.getRefrigerant().getCoolpropName() != null;
     }
 
-    // Computes capacity/power/COP for one point. Uses the faithful engine when the unit's TechSpecs
-    // carries an imported rating; otherwise falls back to the legacy CompressorSpecs polynomial.
-    // The report is ambient-based, so the AW approach bridge is used (Cooling: Te=water-5, Tc=amb+15;
-    // Heating: Te=amb-5, Tc=water+5) with the user's frequency / subcooling / superheat.
-    private Perf computePerf(CompressorSpecs cspecs, CompressorRating rating, Unit unit, Mod mod,
+    // Computes capacity/power/COP for one point via the faithful engine (Frascold cycle or Copeland
+    // polynomial), driven by the unit's CompressorRating. The report is ambient-based, so the AW
+    // approach bridge is used (Cooling: Te=water-5, Tc=amb+15; Heating: Te=amb-5, Tc=water+5) with
+    // the user's frequency / subcooling / superheat.
+    private Perf computePerf(CompressorRating rating, Unit unit, Mod mod,
                              double ambient, double waterTemp, OpInputs op) {
         if (useFaithful(rating)) {
             double te = mod == Mod.HEATING ? ambient - 5.0 : waterTemp - 5.0;
@@ -95,10 +103,12 @@ public class ReportDataAssembler {
             CompressorPerformanceEngine.Suction suction = op.suctionGasTemp() != null
                     ? new CompressorPerformanceEngine.SuctionGasTemp(op.suctionGasTemp())
                     : new CompressorPerformanceEngine.Superheat(op.superheat() != null ? op.superheat() : 10.0);
+            String fluid = rating.getRefrigerant() != null ? rating.getRefrigerant().getCoolpropName() : null;
+            boolean transcritical = rating.getCompressor() != null
+                    && "TK".equalsIgnoreCase(rating.getCompressor().getFrascoldType());
             CompressorPerformanceEngine.Result res = performanceEngine.compute(new CompressorPerformanceEngine.Input(
-                    rating, rating.getRefrigerant().getCoolpropName(),
-                    "TK".equalsIgnoreCase(rating.getCompressor().getFrascoldType()),
-                    te, tc, suction, op.subcooling(), op.frequencyHz(), null));
+                    rating, fluid, transcritical,
+                    te, tc, suction, op.subcooling(), op.frequencyHz(), null, null));
             if (res.valid()) {
                 int qty = Math.max(unit.getCompressorQty(), 1);
                 double coolKw = res.coolingCapacityW() * qty / 1000.0;
@@ -109,12 +119,7 @@ public class ReportDataAssembler {
                 return new Perf(capKw, powKw, powKw > 0 ? capKw / powKw : 0);
             }
         }
-        if (cspecs == null) return new Perf(0, 0, 0);
-        UnitCalculationEngine.Result r = engine.compute(cspecs, unit.getCompressorQty(), mod, ambient, waterTemp);
-        // Legacy engine has no condenser duty; derive it from the energy balance (capacity + power).
-        double capKw = mod == Mod.HEATING ? r.capacityKw() + r.powerKw() : r.capacityKw();
-        double powKw = r.powerKw();
-        return new Perf(capKw, powKw, powKw > 0 ? capKw / powKw : r.copEer());
+        return new Perf(0, 0, 0);
     }
 
     public UnitReportModel assemble(Unit unit, Mod mod,
@@ -146,19 +151,15 @@ public class ReportDataAssembler {
 
         UnitDetails details = findDetails(unit, mod);
         TechSpecs ts = details != null ? details.getTechSpecs() : null;
-        CompressorSpecs cspecs = ts != null ? ts.getCompressorSpecs() : null;
         CompressorRating rating = ts != null ? ts.getCompressorRating() : null;
-        if (cspecs == null && rating == null) {
-            throw new IllegalStateException("No compressor configured for this unit/mode; cannot build report.");
+        if (rating == null) {
+            throw new IllegalStateException("No compressor rating configured for this unit/mode; cannot build report.");
         }
-        // Compressor + refrigerant metadata come from whichever selection the unit uses.
-        Compressor compressor = cspecs != null ? cspecs.getCompressor()
-                : (rating != null ? rating.getCompressor() : null);
-        Refrigerant refrigerant = cspecs != null
-                ? (compressor != null ? compressor.getRefrigerant() : null)
-                : (rating != null ? rating.getRefrigerant() : null);
+        // Compressor + refrigerant metadata come from the rating.
+        Compressor compressor = rating.getCompressor();
+        Refrigerant refrigerant = rating.getRefrigerant();
 
-        Perf design = computePerf(cspecs, rating, unit, mod, ambient, evapOut, coolingOp);
+        Perf design = computePerf(rating, unit, mod, ambient, evapOut, coolingOp);
 
         // A selected glycol mixture scales capacity, power and pressure drop.
         GlycolCorrection.Factors gf = GlycolCorrection.lookup(glycolType, glycolPercentage);
@@ -177,7 +178,7 @@ public class ReportDataAssembler {
         // --- Full load cooling table across the standard ambient range ---
         List<UnitReportModel.FullLoadRow> fullLoad = new ArrayList<>();
         for (double a : FULL_LOAD_AMBIENTS) {
-            Perf r = computePerf(cspecs, rating, unit, mod, a, evapOut, coolingOp);
+            Perf r = computePerf(rating, unit, mod, a, evapOut, coolingOp);
             double cap = r.capacityKw() * gf.capacity();
             double pow = r.powerKw() * gf.power();
             fullLoad.add(UnitReportModel.FullLoadRow.builder()
@@ -246,10 +247,9 @@ public class ReportDataAssembler {
         if (dualMode) {
             UnitDetails hDetails = findDetails(unit, Mod.HEATING);
             TechSpecs hts = hDetails != null ? hDetails.getTechSpecs() : null;
-            CompressorSpecs hcs = hts != null ? hts.getCompressorSpecs() : null;
             CompressorRating hrating = hts != null ? hts.getCompressorRating() : null;
-            if (hcs != null || hrating != null) {
-                Perf hr = computePerf(hcs, hrating, unit, Mod.HEATING, heatingAmbient, heatingWaterOutlet, heatingOp);
+            if (hrating != null) {
+                Perf hr = computePerf(hrating, unit, Mod.HEATING, heatingAmbient, heatingWaterOutlet, heatingOp);
                 // Heating heats the water, so no glycol correction is applied to heating values.
                 double hCap = hr.capacityKw();
                 double hPow = hr.powerKw();
@@ -258,7 +258,7 @@ public class ReportDataAssembler {
                 // Heating full-load table across the heating ambient range (held at the entered
                 // heating water outlet), same shape as the cooling table.
                 for (double a : HEATING_FULL_LOAD_AMBIENTS) {
-                    Perf fr = computePerf(hcs, hrating, unit, Mod.HEATING, a, heatingWaterOutlet, heatingOp);
+                    Perf fr = computePerf(hrating, unit, Mod.HEATING, a, heatingWaterOutlet, heatingOp);
                     double cap = fr.capacityKw();
                     double pow = fr.powerKw();
                     heatingFullLoad.add(UnitReportModel.FullLoadRow.builder()
@@ -389,17 +389,9 @@ public class ReportDataAssembler {
     public OperatingPoint computeOperatingPoint(Unit unit, Mod mod, double ambient, double waterTemp, OpInputs op) {
         UnitDetails details = findDetails(unit, mod);
         TechSpecs ts = details != null ? details.getTechSpecs() : null;
-        CompressorSpecs cspecs = ts != null ? ts.getCompressorSpecs() : null;
         CompressorRating rating = ts != null ? ts.getCompressorRating() : null;
-        Perf p = computePerf(cspecs, rating, unit, mod, ambient, waterTemp, op);
+        Perf p = computePerf(rating, unit, mod, ambient, waterTemp, op);
         return new OperatingPoint(p.capacityKw(), p.powerKw(), p.copEer());
-    }
-
-    private String compressorField(CompressorSpecs cspecs, boolean model) {
-        Compressor c = cspecs.getCompressor();
-        if (c == null) return "-";
-        String v = model ? c.getModel() : c.getBrand();
-        return (v == null || v.isBlank()) ? "-" : v;
     }
 
     private String condenserType(TechSpecs ts) {

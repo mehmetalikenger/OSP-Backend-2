@@ -35,14 +35,6 @@ public class ComponentController {
         return HttpStatus.OK;
     }
 
-    @PostMapping("/addCompressorSpecs")
-    public HttpStatus addCompressorSpecs(@Valid @RequestBody CompressorSpecsDTO dto){
-
-        componentAppService.addCompressorSpecs(dto);
-
-        return HttpStatus.OK;
-    }
-
     @GetMapping("/compressors")
     public ResponseEntity<List<Compressor>> getAllCompressors() {
         return ResponseEntity.ok(componentAppService.getAllCompressors());
@@ -56,17 +48,30 @@ public class ComponentController {
         return HttpStatus.OK;
     }
 
-    @PutMapping("/editCompressorSpecs/{specId}")
-    public HttpStatus editCompressorSpecs(@PathVariable Long specId, @Valid @RequestBody CompressorSpecsDTO dto){
+    // --- COMPRESSOR RATING (compressor + refrigerant coefficient set) ---
 
-        componentAppService.editCompressorSpecs(specId, dto);
-
+    @PostMapping("/addCompressorRating")
+    public HttpStatus addCompressorRating(@Valid @RequestBody CompressorRatingDTO dto){
+        componentAppService.addCompressorRating(dto);
         return HttpStatus.OK;
     }
 
-    @GetMapping("/allCompressorSpecs")
-    public ResponseEntity<List<CompressorSpecsResponseDTO>> getAllCompressorSpecs() {
-        return ResponseEntity.ok(componentAppService.getAllCompressorSpecs());
+    @PutMapping("/editCompressorRating/{ratingId}")
+    public HttpStatus editCompressorRating(@PathVariable Long ratingId, @Valid @RequestBody CompressorRatingDTO dto){
+        componentAppService.editCompressorRating(ratingId, dto);
+        return HttpStatus.OK;
+    }
+
+    @GetMapping("/allCompressorRatings")
+    public ResponseEntity<List<CompressorRatingResponseDTO>> getAllCompressorRatings() {
+        return ResponseEntity.ok(componentAppService.getAllCompressorRatings());
+    }
+
+    // Upsert a rating's per-mode nominal capacity (keyed by rating + mod); used by both brands.
+    @PostMapping("/addCompressorModeCapacity")
+    public HttpStatus addCompressorModeCapacity(@Valid @RequestBody CompressorModeCapacityDTO dto){
+        componentAppService.addCompressorModeCapacity(dto);
+        return HttpStatus.OK;
     }
 
     @PostMapping("/addEvaporator")

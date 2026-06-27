@@ -19,10 +19,7 @@ public class CompressorDTO {
     @Pattern(regexp = "^(?i)(RC|SC|SCR|ISCR)$", message = "Invalid compressor type.")
     private String type;
 
-    // Maximum Operating Current and Locked Rotor Amperage (A).
-    private double moc;
-    private double lra;
-
-    // Refrigerant is selected on the compressor (after LRA). Optional.
-    private Long refrigerantId;
+    // Maximum Operating Current and Locked Rotor Amperage (A). Optional — admins may leave them blank.
+    private Double moc;
+    private Double lra;
 }

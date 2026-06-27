@@ -4,6 +4,7 @@ import org.offitec.osp.domain.entity.*;
 import org.offitec.osp.domain.enums.CompressorKind;
 import org.offitec.osp.domain.enums.CondenserType;
 import org.offitec.osp.domain.enums.EvaporatorType;
+import org.offitec.osp.domain.enums.Mod;
 import org.offitec.osp.domain.exception.*;
 import org.offitec.osp.domain.service.ComponentDomainService;
 import org.offitec.osp.domain.service.AuditLogService;
@@ -23,7 +24,8 @@ public class ComponentAppService {
 
     private final ComponentDomainService componentDomainService;
     private final CompressorRepository compressorRepository;
-    private final CompressorSpecsRepository compressorSpecsRepository;
+    private final CompressorRatingRepository compressorRatingRepository;
+    private final CompressorModeCapacityRepository compressorModeCapacityRepository;
     private final EvaporatorRepository evaporatorRepository;
     private final EvaporatorSpecsRepository evaporatorSpecsRepository;
     private final CondenserRepository condenserRepository;
@@ -37,10 +39,11 @@ public class ComponentAppService {
     private final AuditLogService auditLogService;
     private final UserRepositoryPort userRepositoryPort;
 
-    public ComponentAppService(ComponentDomainService componentDomainService, CompressorRepository compressorRepository, CompressorSpecsRepository compressorSpecsRepository, EvaporatorRepository evaporatorRepository, EvaporatorSpecsRepository evaporatorSpecsRepository, CondenserRepository condenserRepository, CondenserSpecsRepository condenserSpecsRepository, ExpansionValveRepository expansionValveRepository, ExpansionValveSpecsRepository expansionValveSpecsRepository, FourWayReversingValveRepository fourWayReversingValveRepository, FourWayReversingValveSpecsRepository fourWayReversingValveSpecsRepository, ChassisRepository chassisRepository, RefrigerantRepository refrigerantRepository, AuditLogService auditLogService, UserRepositoryPort userRepositoryPort) {
+    public ComponentAppService(ComponentDomainService componentDomainService, CompressorRepository compressorRepository, CompressorRatingRepository compressorRatingRepository, CompressorModeCapacityRepository compressorModeCapacityRepository, EvaporatorRepository evaporatorRepository, EvaporatorSpecsRepository evaporatorSpecsRepository, CondenserRepository condenserRepository, CondenserSpecsRepository condenserSpecsRepository, ExpansionValveRepository expansionValveRepository, ExpansionValveSpecsRepository expansionValveSpecsRepository, FourWayReversingValveRepository fourWayReversingValveRepository, FourWayReversingValveSpecsRepository fourWayReversingValveSpecsRepository, ChassisRepository chassisRepository, RefrigerantRepository refrigerantRepository, AuditLogService auditLogService, UserRepositoryPort userRepositoryPort) {
         this.componentDomainService = componentDomainService;
         this.compressorRepository = compressorRepository;
-        this.compressorSpecsRepository = compressorSpecsRepository;
+        this.compressorRatingRepository = compressorRatingRepository;
+        this.compressorModeCapacityRepository = compressorModeCapacityRepository;
         this.evaporatorRepository = evaporatorRepository;
         this.evaporatorSpecsRepository = evaporatorSpecsRepository;
         this.condenserRepository = condenserRepository;
@@ -60,22 +63,16 @@ public class ComponentAppService {
 
         componentDomainService.validateUniqueModel(dto.getModel());
 
+        // Identity only (brand, type, model, moc, lra). Refrigerant + coefficients live on
+        // CompressorRating now. The add flow is Copeland-driven; brand is taken as provided (lenient).
         Compressor compressor = new Compressor();
         compressor.setType(CompressorKind.valueOf(dto.getType().toUpperCase()));
         compressor.setBrand(dto.getBrand());
         compressor.setModel(dto.getModel());
         compressor.setMoc(dto.getMoc());
         compressor.setLra(dto.getLra());
-        compressor.setRefrigerant(resolveRefrigerant(dto.getRefrigerantId()));
 
         compressorRepository.save(compressor);
-    }
-
-    // Resolves an optional refrigerant id to its entity (null id -> null, unknown id -> error).
-    private Refrigerant resolveRefrigerant(Long refrigerantId) {
-        if (refrigerantId == null) return null;
-        return refrigerantRepository.findById(refrigerantId)
-                .orElseThrow(() -> new RefrigerantDoesntExistException("Selected refrigerant doesn't exist."));
     }
 
     public List<Compressor> getAllCompressors() {
@@ -83,122 +80,144 @@ public class ComponentAppService {
     }
 
     @Transactional
-    public void addCompressorSpecs(CompressorSpecsDTO dto){
-
-        Optional<Compressor> dbCompressor = compressorRepository.findById(dto.getCompressorId());
-
-        if(dbCompressor.isEmpty()){
-            throw new CompressorDoesntExistException("Compressor doesn't exist.");
-        }
-
-        Compressor compressor = dbCompressor.get();
-
-        CompressorSpecs specs = new CompressorSpecs();
-        specs.setCompressor(compressor);
-        applyCompressorSpecsFields(specs, dto);
-
-        compressorSpecsRepository.save(specs);
-    }
-
-    // Shared field copy for add/edit compressor specs (capacity/power, RPMs and all
-    // capacity/power coefficients). RPMs and qC11..qC20 are ISCR-only (null otherwise).
-    private void applyCompressorSpecsFields(CompressorSpecs specs, CompressorSpecsDTO dto) {
-        specs.setCapacity(dto.getCapacity());
-        specs.setPowerInput(dto.getPowerInput());
-        specs.setRpmBase(dto.getRpmBase());
-        specs.setRpmMin(dto.getRpmMin());
-        specs.setRpmMax(dto.getRpmMax());
-        specs.setQC1(dto.getQC1()); specs.setQC2(dto.getQC2()); specs.setQC3(dto.getQC3());
-        specs.setQC4(dto.getQC4()); specs.setQC5(dto.getQC5()); specs.setQC6(dto.getQC6());
-        specs.setQC7(dto.getQC7()); specs.setQC8(dto.getQC8()); specs.setQC9(dto.getQC9());
-        specs.setQC10(dto.getQC10());
-        specs.setQC11(dto.getQC11()); specs.setQC12(dto.getQC12()); specs.setQC13(dto.getQC13());
-        specs.setQC14(dto.getQC14()); specs.setQC15(dto.getQC15()); specs.setQC16(dto.getQC16());
-        specs.setQC17(dto.getQC17()); specs.setQC18(dto.getQC18()); specs.setQC19(dto.getQC19());
-        specs.setQC20(dto.getQC20());
-        specs.setPC1(dto.getPC1()); specs.setPC2(dto.getPC2()); specs.setPC3(dto.getPC3());
-        specs.setPC4(dto.getPC4()); specs.setPC5(dto.getPC5()); specs.setPC6(dto.getPC6());
-        specs.setPC7(dto.getPC7()); specs.setPC8(dto.getPC8()); specs.setPC9(dto.getPC9());
-        specs.setPC10(dto.getPC10());
-        specs.setPC11(dto.getPC11()); specs.setPC12(dto.getPC12()); specs.setPC13(dto.getPC13());
-        specs.setPC14(dto.getPC14()); specs.setPC15(dto.getPC15()); specs.setPC16(dto.getPC16());
-        specs.setPC17(dto.getPC17()); specs.setPC18(dto.getPC18()); specs.setPC19(dto.getPC19());
-        specs.setPC20(dto.getPC20());
-    }
-
-    @Transactional
     @EvictsUnitCaches
     public void editCompressor(Long id, CompressorDTO dto) {
 
-        componentDomainService.validateUniqueModelForEdit(dto.getModel(), id);
+        Compressor compressor = compressorRepository.findById(id)
+                .orElseThrow(() -> new CompressorDoesntExistException("Compressor doesn't exist."));
 
-        Optional<Compressor> dbCompressor = compressorRepository.findById(id);
-
-        if(dbCompressor.isEmpty()){
-            throw new CompressorDoesntExistException("Compressor doesn't exist.");
+        // Brand-based permissions: Frascold compressors are import-managed, so only their electrical
+        // ratings (moc/lra) are editable. Copeland (admin-created) compressors are fully editable.
+        if (isCopeland(compressor.getBrand())) {
+            componentDomainService.validateUniqueModelForEdit(dto.getModel(), id);
+            compressor.setType(CompressorKind.valueOf(dto.getType().toUpperCase()));
+            compressor.setBrand(dto.getBrand());
+            compressor.setModel(dto.getModel());
         }
-
-        Compressor compressor = dbCompressor.get();
-        compressor.setType(CompressorKind.valueOf(dto.getType().toUpperCase()));
-        compressor.setBrand(dto.getBrand());
-        compressor.setModel(dto.getModel());
         compressor.setMoc(dto.getMoc());
         compressor.setLra(dto.getLra());
-        compressor.setRefrigerant(resolveRefrigerant(dto.getRefrigerantId()));
 
         compressorRepository.save(compressor);
     }
 
+    // --- COMPRESSOR RATING (compressor + refrigerant coefficient set) ---
+
     @Transactional
     @EvictsUnitCaches
-    public void editCompressorSpecs(Long specId, CompressorSpecsDTO dto) {
+    public void addCompressorRating(CompressorRatingDTO dto) {
+        Compressor compressor = compressorRepository.findById(dto.getCompressorId())
+                .orElseThrow(() -> new CompressorDoesntExistException("Compressor doesn't exist."));
+        Refrigerant refrigerant = refrigerantRepository.findById(dto.getRefrigerantId())
+                .orElseThrow(() -> new RefrigerantDoesntExistException("Selected refrigerant doesn't exist."));
 
-        Optional<CompressorSpecs> dbSpecs = compressorSpecsRepository.findById(specId);
-
-        if(dbSpecs.isEmpty()){
-            throw new CompressorSpecsDoesntExistException("Compressor Specs doesn't exist.");
-        }
-
-        CompressorSpecs specs = dbSpecs.get();
-        applyCompressorSpecsFields(specs, dto);
-
-        compressorSpecsRepository.save(specs);
+        CompressorRating rating = new CompressorRating();
+        rating.setCompressor(compressor);
+        rating.setRefrigerant(refrigerant);
+        applyRatingFields(rating, dto);
+        compressorRatingRepository.save(rating);
     }
 
-    public List<CompressorSpecsResponseDTO> getAllCompressorSpecs() {
-        return compressorSpecsRepository.findAll().stream().filter(specs -> specs.getCompressor() != null && !specs.getCompressor().isDeleted()).map(specs -> {
-            CompressorSpecsResponseDTO dto = new CompressorSpecsResponseDTO();
-            dto.setId(specs.getId());
-            dto.setCapacity(specs.getCapacity());
-            dto.setPowerInput(specs.getPowerInput());
-            if (specs.getCompressor() != null) {
-                dto.setBrand(specs.getCompressor().getBrand());
-                dto.setModel(specs.getCompressor().getModel());
-                dto.setType(specs.getCompressor().getType().name());
-                dto.setRefrigerantId(specs.getCompressor().getRefrigerant() != null
-                        ? specs.getCompressor().getRefrigerant().getId() : null);
-            }
-            dto.setRpmBase(specs.getRpmBase());
-            dto.setRpmMin(specs.getRpmMin());
-            dto.setRpmMax(specs.getRpmMax());
-            dto.setQC1(specs.getQC1()); dto.setQC2(specs.getQC2()); dto.setQC3(specs.getQC3());
-            dto.setQC4(specs.getQC4()); dto.setQC5(specs.getQC5()); dto.setQC6(specs.getQC6());
-            dto.setQC7(specs.getQC7()); dto.setQC8(specs.getQC8()); dto.setQC9(specs.getQC9());
-            dto.setQC10(specs.getQC10());
-            dto.setQC11(specs.getQC11()); dto.setQC12(specs.getQC12()); dto.setQC13(specs.getQC13());
-            dto.setQC14(specs.getQC14()); dto.setQC15(specs.getQC15()); dto.setQC16(specs.getQC16());
-            dto.setQC17(specs.getQC17()); dto.setQC18(specs.getQC18()); dto.setQC19(specs.getQC19());
-            dto.setQC20(specs.getQC20());
-            dto.setPC1(specs.getPC1()); dto.setPC2(specs.getPC2()); dto.setPC3(specs.getPC3());
-            dto.setPC4(specs.getPC4()); dto.setPC5(specs.getPC5()); dto.setPC6(specs.getPC6());
-            dto.setPC7(specs.getPC7()); dto.setPC8(specs.getPC8()); dto.setPC9(specs.getPC9());
-            dto.setPC10(specs.getPC10());
-            dto.setPC11(specs.getPC11()); dto.setPC12(specs.getPC12()); dto.setPC13(specs.getPC13());
-            dto.setPC14(specs.getPC14()); dto.setPC15(specs.getPC15()); dto.setPC16(specs.getPC16());
-            dto.setPC17(specs.getPC17()); dto.setPC18(specs.getPC18()); dto.setPC19(specs.getPC19());
-            dto.setPC20(specs.getPC20());
-            return dto;
+    // Edit a rating's coefficients/reference/speed. Copeland-only: Frascold coefficient sets are
+    // owned by the importer and rejected here.
+    @Transactional
+    @EvictsUnitCaches
+    public void editCompressorRating(Long ratingId, CompressorRatingDTO dto) {
+        CompressorRating rating = compressorRatingRepository.findById(ratingId)
+                .orElseThrow(() -> new CompressorDoesntExistException("Compressor rating doesn't exist."));
+        if (rating.getCompressor() == null || !isCopeland(rating.getCompressor().getBrand())) {
+            throw new IllegalArgumentException("Only Copeland ratings can be edited.");
+        }
+        if (dto.getRefrigerantId() != null) {
+            rating.setRefrigerant(refrigerantRepository.findById(dto.getRefrigerantId())
+                    .orElseThrow(() -> new RefrigerantDoesntExistException("Selected refrigerant doesn't exist.")));
+        }
+        applyRatingFields(rating, dto);
+        compressorRatingRepository.save(rating);
+    }
+
+    // Shared field copy for add/edit rating: coefficients, reference condition (defaults ohRef=10,
+    // scRef=0), inverter range.
+    private void applyRatingFields(CompressorRating r, CompressorRatingDTO dto) {
+        r.setCapCoeffs(dto.getCapCoeffs());
+        r.setPowerCoeffs(dto.getPowerCoeffs());
+        r.setMassCoeffs(dto.getMassCoeffs());
+        r.setOhRef(dto.getOhRef() != null ? dto.getOhRef() : 10.0);
+        r.setScRef(dto.getScRef() != null ? dto.getScRef() : 0.0);
+        r.setMinFrequency(dto.getMinFrequency());
+        r.setMaxFrequency(dto.getMaxFrequency());
+        r.setMinSpeed(dto.getMinSpeed());
+        r.setMaxSpeed(dto.getMaxSpeed());
+    }
+
+    // Upsert a rating's per-mode nominal capacity, keyed by (rating, mod). Usable by both brands —
+    // this is how Frascold ratings (which import with no mode-capacities) get their duties filled.
+    @Transactional
+    @EvictsUnitCaches
+    public void addCompressorModeCapacity(CompressorModeCapacityDTO dto) {
+        CompressorRating rating = compressorRatingRepository.findById(dto.getCompressorRatingId())
+                .orElseThrow(() -> new CompressorDoesntExistException("Compressor rating doesn't exist."));
+        Mod mod = Mod.valueOf(dto.getMod().trim().toUpperCase());
+
+        CompressorModeCapacity mc = rating.getModeCapacities().stream()
+                .filter(c -> c.getMod() == mod).findFirst().orElse(null);
+        if (mc == null) {
+            mc = new CompressorModeCapacity();
+            mc.setMod(mod);
+            rating.getModeCapacities().add(mc);
+        }
+        mc.setCapacity(dto.getCapacity());
+        mc.setPowerInput(dto.getPowerInput());
+        mc.setMaxCapacity(dto.getMaxCapacity());
+        compressorRatingRepository.save(rating); // cascade persists the child with the FK set
+    }
+
+    @Transactional(readOnly = true)
+    public List<CompressorRatingResponseDTO> getAllCompressorRatings() {
+        return compressorRatingRepository.findAll().stream()
+                .filter(r -> r.getCompressor() != null && !r.getCompressor().isDeleted())
+                .map(this::toRatingResponse)
+                .collect(Collectors.toList());
+    }
+
+    private CompressorRatingResponseDTO toRatingResponse(CompressorRating r) {
+        CompressorRatingResponseDTO dto = new CompressorRatingResponseDTO();
+        dto.setId(r.getId());
+        Compressor c = r.getCompressor();
+        if (c != null) {
+            dto.setCompressorId(c.getId());
+            dto.setBrand(c.getBrand());
+            dto.setType(c.getType() != null ? c.getType().name() : null);
+            dto.setModel(c.getModel());
+        }
+        if (r.getRefrigerant() != null) {
+            dto.setRefrigerantId(r.getRefrigerant().getId());
+            dto.setRefrigerantCode(r.getRefrigerant().getCode());
+        }
+        dto.setCapCoeffs(r.getCapCoeffs());
+        dto.setPowerCoeffs(r.getPowerCoeffs());
+        dto.setMassCoeffs(r.getMassCoeffs());
+        dto.setOhRef(r.getOhRef());
+        dto.setScRef(r.getScRef());
+        dto.setMinFrequency(r.getMinFrequency());
+        dto.setMaxFrequency(r.getMaxFrequency());
+        dto.setMinSpeed(r.getMinSpeed());
+        dto.setMaxSpeed(r.getMaxSpeed());
+        List<CompressorModeCapacityDTO> caps = r.getModeCapacities().stream().map(mc -> {
+            CompressorModeCapacityDTO m = new CompressorModeCapacityDTO();
+            m.setCompressorRatingId(r.getId());
+            m.setMod(mc.getMod().name());
+            m.setCapacity(mc.getCapacity());
+            m.setPowerInput(mc.getPowerInput());
+            m.setMaxCapacity(mc.getMaxCapacity());
+            return m;
         }).collect(Collectors.toList());
+        dto.setModeCapacities(caps);
+        return dto;
+    }
+
+    // The admin brand option is spelled "Copelant" (a typo for Copeland); accept both.
+    private static boolean isCopeland(String brand) {
+        return brand != null && brand.trim().toLowerCase().startsWith("copel");
     }
 
     @Transactional

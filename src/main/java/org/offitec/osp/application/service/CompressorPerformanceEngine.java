@@ -39,7 +39,8 @@ public class CompressorPerformanceEngine {
             Suction suction,
             double subcoolingK,      // liquid subcooling below the condenser bubble point
             double frequencyHz,      // 50, 60, or an inverter frequency
-            Double evapSuperheatK    // optional: evaporator-outlet superheat for evaporator duty
+            Double evapSuperheatK,   // optional: evaporator-outlet superheat for evaporator duty
+            Double rpm               // optional: compressor speed (Copeland trivariate variable R)
     ) {}
 
     public record Result(
@@ -62,13 +63,29 @@ public class CompressorPerformanceEngine {
     }
 
     public boolean isSupported(Input in) {
-        return props.isAvailable() && !in.transcritical()
-                && in.coolpropFluid() != null && in.rating() != null;
+        if (in.rating() == null) return false;
+        // Copeland ratings use the direct polynomial path: supported as long as they carry
+        // coefficients. CoolProp is only needed for the optional subcooling bump.
+        if (isCopeland(in.rating())) {
+            return in.rating().getCapCoeffs() != null && in.rating().getPowerCoeffs() != null;
+        }
+        return props.isAvailable() && !in.transcritical() && in.coolpropFluid() != null;
+    }
+
+    // Brand-driven engine branch: Copeland (admin-entered direct polynomials, incl. the typo'd
+    // "Copelant") vs Frascold (imported cycle reconstruction). Matches the legacy UnitCalculationEngine.
+    private static boolean isCopeland(CompressorRating r) {
+        if (r == null || r.getCompressor() == null) return false;
+        String b = r.getCompressor().getBrand();
+        return b != null && b.trim().toLowerCase().startsWith("copel");
     }
 
     public Result compute(Input in) {
         if (!isSupported(in)) {
             return invalid();
+        }
+        if (isCopeland(in.rating())) {
+            return computeCopeland(in);
         }
         final String f = in.coolpropFluid();
         final CompressorRating r = in.rating();
@@ -151,6 +168,99 @@ public class CompressorPerformanceEngine {
         return new Result(coolingCapacity, power, cop, massFlow * 3600.0,
                 condDutyW, evaporatorDuty, dischargeTempC,
                 tSucK - 273.15, tLiqK - 273.15, within, valid);
+    }
+
+    /**
+     * Copeland direct-polynomial path. The capacity/power coefficient sets give kW directly as a
+     * polynomial in (S = evaporating temp, D = condensing temp, R = speed) — bivariate (10 coeffs,
+     * fixed-speed) or trivariate (20 coeffs, variable-speed). Mass flow is NOT a separate polynomial:
+     * it is derived from the capacity and the refrigerating effect (h_suction − h_liquid_sat) via
+     * CoolProp, exactly like the Frascold path. The same enthalpies give the subcooling correction.
+     */
+    private Result computeCopeland(Input in) {
+        final CompressorRating r = in.rating();
+        final double S = in.evapTempC();
+        final double D = in.condTempC();
+        // Variable-speed Copeland: the trivariate's speed variable R (rpm) is driven by the drive
+        // frequency — R = Hz × 60 (2-pole synchronous speed: 50 Hz → 3000 rpm, 60 Hz → 3600 rpm).
+        // An explicit rpm still overrides; if neither is usable, fall back to the rating's max speed.
+        final double R = in.rpm() != null ? in.rpm()
+                : in.frequencyHz() > 0 ? in.frequencyHz() * 60.0
+                : (r.getMaxSpeed() != null ? r.getMaxSpeed() : 3000.0);
+
+        final double capKw = poly(r.getCapCoeffs(), S, D, R);     // kW (at the polynomial's reference subcooling)
+        final double powerKw = poly(r.getPowerCoeffs(), S, D, R); // kW
+
+        double coolingCapacityW = capKw * 1000.0;
+        final double powerInputW = powerKw * 1000.0;
+
+        // Mass flow + subcooling correction come from the refrigerant cycle (CoolProp): the reference
+        // capacity divided by the refrigerating effect (h_suction − h_satLiquid) is the mass flow, and
+        // subcooling below the bubble point adds ṁ·Δh. Skipped (mass flow 0, no SC bump) when CoolProp
+        // is unavailable or the lookups don't converge.
+        double massKgS = 0.0;
+        double dischargeTempC = 0.0;
+        if (props.isAvailable() && in.coolpropFluid() != null) {
+            try {
+                final String f = in.coolpropFluid();
+                final double pEvap = props.pDew(f, S + 273.15);
+                final double tSucK = switch (in.suction()) {
+                    case Superheat sh -> S + sh.kelvin() + 273.15;
+                    case SuctionGasTemp t -> t.celsius() + 273.15;
+                };
+                final double h1 = props.enthalpyTp(f, tSucK, pEvap);
+                final double pCond = props.pDew(f, D + 273.15);
+                final double tBubCondK = props.tBubble(f, pCond);
+                final double hSatLiq = props.enthalpyBubble(f, tBubCondK);
+                if (finite(pEvap, h1, pCond, tBubCondK, hSatLiq) && h1 - hSatLiq > 0) {
+                    massKgS = coolingCapacityW / (h1 - hSatLiq); // derive mass flow from the capacity
+                    if (in.subcoolingK() > 1e-4) {
+                        final double hSub = props.enthalpyTp(f, (D - in.subcoolingK()) + 273.15, pCond);
+                        final double dh = hSatLiq - hSub; // J/kg
+                        if (finite(hSub, dh)) coolingCapacityW += massKgS * dh; // W
+                    }
+                    // Discharge state (point 2): h2 = h_suction + power/ṁ, then the discharge gas
+                    // temperature from a (p,h) inverse lookup at condensing pressure — same construction
+                    // as the Frascold path. Left at 0 if the lookup doesn't converge.
+                    if (massKgS > 0) {
+                        final double h2 = h1 + powerInputW / massKgS;
+                        final double tDisK = props.temperaturePh(f, pCond, h2);
+                        if (finite(h2, tDisK)) dischargeTempC = tDisK - 273.15;
+                    }
+                }
+            } catch (RuntimeException ignored) {
+                // non-finite / out-of-range property lookup → mass flow 0, capacity stays at the polynomial value
+            }
+        }
+
+        final double condenserDutyW = coolingCapacityW + powerInputW;
+        final double cop = powerInputW > 0 ? coolingCapacityW / powerInputW : 0;
+        final boolean within = pointInPolygon(S, D, r.getEnvelope());
+        final boolean valid = finite(capKw, powerKw);
+
+        return new Result(coolingCapacityW, powerInputW, cop, massKgS * 3600.0,
+                condenserDutyW, coolingCapacityW, dischargeTempC, 0, 0, within, valid);
+    }
+
+    // Copeland polynomial: trivariate (>=20 coeffs) in (S,D,R) or bivariate (10 coeffs) in (S,D).
+    static double poly(double[] c, double S, double D, double R) {
+        if (c == null) return 0.0;
+        return c.length >= 20 ? trivariate(c, S, D, R) : bivariate(c, S, D);
+    }
+
+    static double bivariate(double[] c, double S, double D) {
+        return c[0] + c[1] * S + c[2] * D
+                + c[3] * S * S + c[4] * S * D + c[5] * D * D
+                + c[6] * S * S * S + c[7] * D * S * S + c[8] * S * D * D + c[9] * D * D * D;
+    }
+
+    static double trivariate(double[] c, double S, double D, double R) {
+        return c[0] + c[1] * S + c[2] * D + c[3] * R
+                + c[4] * S * D + c[5] * S * R + c[6] * D * R
+                + c[7] * S * S + c[8] * D * D + c[9] * R * R
+                + c[10] * S * D * R + c[11] * S * S * D + c[12] * S * S * R + c[13] * S * S * S
+                + c[14] * S * D * D + c[15] * D * D * R + c[16] * D * D * D
+                + c[17] * S * R * R + c[18] * D * R * R + c[19] * R * R * R;
     }
 
     // EN12900 10-coefficient bivariate cubic in (t0, tc) [°C]. Matches Compressor.CoolingCapacityRef.

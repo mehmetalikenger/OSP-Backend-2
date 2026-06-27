@@ -84,23 +84,24 @@ public interface UnitJpaRepository extends JpaRepository<Unit, Long>, UnitReposi
                                     @Param("unitType") UnitTypeEnum unitType,
                                     Pageable pageable);
 
-    // Loads the candidate units for a products-page capacity match with their compressor
-    // polynomial in hand (unit -> details -> techSpecs -> compressorSpecs fetched), so the
+    // Loads the candidate units for a products-page capacity match with their compressor rating
+    // in hand (unit -> details -> techSpecs -> compressorRating -> compressor fetched), so the
     // capacity for each can be computed without per-unit lazy loads. Refrigerant is an
     // optional code filter (null = any). DISTINCT dedupes the unitDetails collection join.
     @Query("""
             SELECT DISTINCT u FROM Unit u
             LEFT JOIN FETCH u.unitDetails d
             LEFT JOIN FETCH d.techSpecs ts
-            LEFT JOIN FETCH ts.compressorSpecs cs            WHERE u.category = :category
+            LEFT JOIN FETCH ts.compressorRating cr
+            LEFT JOIN FETCH cr.compressor cmp
+            WHERE u.category = :category
               AND u.unitType = :unitType
               AND u.deleted = false
               AND (:refCode IS NULL OR EXISTS (
                     SELECT 1 FROM UnitDetails d2
                     JOIN d2.techSpecs ts2
-                    JOIN ts2.compressorSpecs cs2
-                    JOIN cs2.compressor cmp2
-                    WHERE d2.unit = u AND cmp2.refrigerant.code = :refCode))
+                    JOIN ts2.compressorRating cr2
+                    WHERE d2.unit = u AND cr2.refrigerant.code = :refCode))
             """)
     List<Unit> findUnitsForMatching(@Param("category") UnitCategory category,
                                     @Param("unitType") UnitTypeEnum unitType,
@@ -147,17 +148,16 @@ public interface UnitJpaRepository extends JpaRepository<Unit, Long>, UnitReposi
             """)
     List<Object[]> findIconUrls(@Param("unitIds") List<Long> unitIds);
 
-    // Refrigerant code per unit, derived from the unit's compressor (refrigerant moved to
-    // the Compressor). Each row is [unitId, refrigerantCode]. A unit may have several modes
+    // Refrigerant code per unit, derived from the unit's compressor rating (refrigerant lives on
+    // CompressorRating). Each row is [unitId, refrigerantCode]. A unit may have several modes
     // (hence several rows); the service picks one representative. Used to fill the catalog/
     // saved card `refrigerant` field in one query (same N+1-avoidance as findIconUrls).
     @Query("""
-            SELECT DISTINCT d.unit.id, cmp.refrigerant.code
+            SELECT DISTINCT d.unit.id, cr.refrigerant.code
             FROM UnitDetails d
             JOIN d.techSpecs ts
-            JOIN ts.compressorSpecs cs
-            JOIN cs.compressor cmp
-            WHERE d.unit.id IN :unitIds AND cmp.refrigerant IS NOT NULL
+            JOIN ts.compressorRating cr
+            WHERE d.unit.id IN :unitIds AND cr.refrigerant IS NOT NULL
             """)
     List<Object[]> findRefrigerantCodesByUnitIds(@Param("unitIds") List<Long> unitIds);
 
@@ -172,9 +172,9 @@ public interface UnitJpaRepository extends JpaRepository<Unit, Long>, UnitReposi
             LEFT JOIN FETCH u.unitDetails d
             LEFT JOIN FETCH d.defCalcValues
             LEFT JOIN FETCH d.techSpecs ts
-            LEFT JOIN FETCH ts.compressorSpecs cs
-            LEFT JOIN FETCH cs.compressor cmp
-            LEFT JOIN FETCH cmp.refrigerant
+            LEFT JOIN FETCH ts.compressorRating cr
+            LEFT JOIN FETCH cr.compressor cmp
+            LEFT JOIN FETCH cr.refrigerant
             LEFT JOIN FETCH ts.condenserSpecs cds
             LEFT JOIN FETCH cds.condenser
             LEFT JOIN FETCH ts.evaporatorSpecs es

@@ -8,13 +8,8 @@ import lombok.Setter;
 @Setter
 public class UnitTechSpecsDTO {
 
-    public double capacity;
-    public double maxCapacity;
-
-    // Legacy detailed-coefficient compressor (optional now). For AW units the admin instead selects
-    // an imported Frascold rating (model + refrigerant) via compressorRatingId.
-    public Long compressorSpecsId;
-    // Imported Frascold rating id (model + refrigerant). When set, the faithful engine is used.
+    // Compressor rating id (compressor + refrigerant coefficient set). Per-mode capacity lives on
+    // the rating's mode-capacities now, so it is no longer sent on the unit.
     public Long compressorRatingId;
     public int compressorQty;
 

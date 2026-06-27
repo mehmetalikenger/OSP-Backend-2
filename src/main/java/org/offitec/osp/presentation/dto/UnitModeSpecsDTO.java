@@ -7,15 +7,12 @@ import lombok.Getter;
 @Getter
 public class UnitModeSpecsDTO {
 
-    public double capacity;
-    public double maxCapacity;
     public double copErr;
     public double condenserRequiredDuty;
     public double quietCondenserRequiredDuty;
 
-    // Legacy detailed-coefficient compressor (optional now); AW units use compressorRatingId instead.
-    public Long compressorSpecsId;
-    // Imported Frascold rating id (model + refrigerant). When set, the faithful engine is used.
+    // Compressor rating id (compressor + refrigerant coefficient set). For heat pumps the rating is
+    // a unit-level selection (shared by both modes), so this is typically unused here.
     public Long compressorRatingId;
 
     @NotNull(message = "Condenser must be selected.")

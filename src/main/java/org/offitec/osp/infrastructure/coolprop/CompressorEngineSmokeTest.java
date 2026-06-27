@@ -57,7 +57,7 @@ public class CompressorEngineSmokeTest implements CommandLineRunner {
         double teRef = -10, tcRef = 45;
         double refSuperheat = (r.getOhRef() == 999.0) ? (r.getTaspRef() - teRef) : r.getOhRef();
         Result atRef = engine.compute(new Input(r, fluid, tk, teRef, tcRef,
-                new Superheat(refSuperheat), r.getScRef(), 50, null));
+                new Superheat(refSuperheat), r.getScRef(), 50, null, null));
         double polyQ = CompressorPerformanceEngine.en12900(r.getCapCoeffs(), teRef, tcRef);
         double polyP = CompressorPerformanceEngine.en12900(r.getPowerCoeffs(), teRef, tcRef);
         log.info("REFERENCE  Te={} Tc={}: cycle Q={} W vs poly Q={} W  (Δ={}%)",
@@ -67,19 +67,19 @@ public class CompressorEngineSmokeTest implements CommandLineRunner {
                 round(atRef.powerInputW()), round(polyP), round3(atRef.cop()));
 
         // 2) Realistic operating point at 50 Hz, 10 K superheat, 0 K subcooling.
-        Result base = engine.compute(new Input(r, fluid, tk, -10, 45, new Superheat(10), 0, 50, null));
+        Result base = engine.compute(new Input(r, fluid, tk, -10, 45, new Superheat(10), 0, 50, null, null));
         log.info("50Hz SH10 SC0  : Q={} kW  P={} kW  EER={}  mdot={} kg/h  Tdis={} C  inEnv={}",
                 kw(base.coolingCapacityW()), kw(base.powerInputW()), round3(base.cop()),
                 round(base.massFlowKgH()), round(base.dischargeTempC()), base.withinEnvelope());
 
         // 3) Same point with 5 K subcooling → capacity should rise.
-        Result sub = engine.compute(new Input(r, fluid, tk, -10, 45, new Superheat(10), 5, 50, null));
+        Result sub = engine.compute(new Input(r, fluid, tk, -10, 45, new Superheat(10), 5, 50, null, null));
         log.info("50Hz SH10 SC5  : Q={} kW  (Δ vs SC0 = {}%)  P={} kW",
                 kw(sub.coolingCapacityW()), round(100 * (sub.coolingCapacityW() - base.coolingCapacityW()) / base.coolingCapacityW()),
                 kw(sub.powerInputW()));
 
         // 4) Same point at 60 Hz → capacity & power scale by the frequency factor.
-        Result hz60 = engine.compute(new Input(r, fluid, tk, -10, 45, new Superheat(10), 0, 60, null));
+        Result hz60 = engine.compute(new Input(r, fluid, tk, -10, 45, new Superheat(10), 0, 60, null, null));
         log.info("60Hz SH10 SC0  : Q={} kW  (Δ vs 50Hz = {}%)  P={} kW  EER={}",
                 kw(hz60.coolingCapacityW()), round(100 * (hz60.coolingCapacityW() - base.coolingCapacityW()) / base.coolingCapacityW()),
                 kw(hz60.powerInputW()), round3(hz60.cop()));

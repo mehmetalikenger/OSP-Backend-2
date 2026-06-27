@@ -35,12 +35,9 @@ public class Compressor {
     @Column(name = "lra")
     private Double lra;
 
-    // Refrigerant is a property of the compressor (selected in the add/edit compressor
-    // form, after LRA). A unit's refrigerant is derived from its compressor. EAGER so the
-    // compressor lists returned directly as JSON include it without a lazy-init error.
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "refrigerant_id")
-    private Refrigerant refrigerant;
+    // Refrigerant is NOT on the compressor anymore: it lives on CompressorRating
+    // (one rating per compressor + refrigerant). A unit's refrigerant is derived from its
+    // rating via UnitDetails -> TechSpecs -> CompressorRating -> Refrigerant.
 
     // ---- Frascold catalogue data, populated by the frdata.mdb importer. ----
     // These are nullable so admin-created compressors (which don't have them) still persist.

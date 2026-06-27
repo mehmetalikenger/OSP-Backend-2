@@ -72,12 +72,6 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(Map.of("message", ex.getMessage()), HttpStatus.NOT_FOUND);
     }
 
-    @ExceptionHandler(CompressorSpecsDoesntExistException.class)
-    public ResponseEntity<Map<String, String>> handleCompressorSpecsDoesntExistException(RuntimeException ex){
-
-        return new ResponseEntity<>(Map.of("message", ex.getMessage()), HttpStatus.NOT_FOUND);
-    }
-
     @ExceptionHandler(EvaporatorDoesntExistException.class)
     public ResponseEntity<Map<String, String>> handleEvaporatorDoesntExistException(RuntimeException ex){
 

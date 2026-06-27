@@ -28,7 +28,6 @@ public class UnitAppService {
 
     private final UnitDomainService unitDomainService;
     private final UnitJpaRepository unitJpaRepository;
-    private final CompressorSpecsRepository compressorSpecsRepository;
     private final org.offitec.osp.infrastructure.repository.CompressorRatingRepository compressorRatingRepository;
     private final CondenserSpecsRepository condenserSpecsRepository;
     private final EvaporatorSpecsRepository evaporatorSpecsRepository;
@@ -43,7 +42,6 @@ public class UnitAppService {
 
     public UnitAppService(UnitDomainService unitDomainService,
                           UnitJpaRepository unitJpaRepository,
-                          CompressorSpecsRepository compressorSpecsRepository,
                           org.offitec.osp.infrastructure.repository.CompressorRatingRepository compressorRatingRepository,
                           CondenserSpecsRepository condenserSpecsRepository,
                           EvaporatorSpecsRepository evaporatorSpecsRepository,
@@ -57,7 +55,6 @@ public class UnitAppService {
                           UserRepositoryPort userRepositoryPort) {
         this.unitDomainService = unitDomainService;
         this.unitJpaRepository = unitJpaRepository;
-        this.compressorSpecsRepository = compressorSpecsRepository;
         this.compressorRatingRepository = compressorRatingRepository;
         this.condenserSpecsRepository = condenserSpecsRepository;
         this.evaporatorSpecsRepository = evaporatorSpecsRepository;
@@ -377,13 +374,10 @@ public class UnitAppService {
         r.setMinAmbient(unit.getMinAmbient());
         r.setMaxAmbient(unit.getMaxAmbient());
 
-        // per-mode (tech specs)
-        r.setCapacity(ts.getCapacity());
-        r.setMaxCapacity(ts.getMaxCapacity() != null ? ts.getMaxCapacity() : 0.0);
+        // per-mode (tech specs). Capacity now lives on the rating's mode-capacities.
         r.setCopErr(ts.getCopErr());
         r.setCondenserRequiredDuty(ts.getCondenserRequiredDuty());
         r.setQuietCondenserRequiredDuty(ts.getQuietCondenserRequiredDuty());
-        r.setCompressorSpecsId(ts.getCompressorSpecs() != null ? ts.getCompressorSpecs().getId() : null);
         r.setCompressorRatingId(ts.getCompressorRating() != null ? ts.getCompressorRating().getId() : null);
         r.setCondenserSpecsId(ts.getCondenserSpecs() != null ? ts.getCondenserSpecs().getId() : null);
         r.setEvaporatorSpecsId(ts.getEvaporatorSpecs() != null ? ts.getEvaporatorSpecs().getId() : null);
@@ -577,12 +571,9 @@ public class UnitAppService {
 
                 HeatPumpModeDTO m = new HeatPumpModeDTO();
                 m.setMod(d.getMod().name());
-                m.setCapacity(ts.getCapacity());
-                m.setMaxCapacity(ts.getMaxCapacity() != null ? ts.getMaxCapacity() : 0.0);
                 m.setCopErr(ts.getCopErr());
                 m.setCondenserRequiredDuty(ts.getCondenserRequiredDuty());
                 m.setQuietCondenserRequiredDuty(ts.getQuietCondenserRequiredDuty());
-                m.setCompressorSpecsId(ts.getCompressorSpecs() != null ? ts.getCompressorSpecs().getId() : null);
                 m.setCompressorRatingId(ts.getCompressorRating() != null ? ts.getCompressorRating().getId() : null);
                 m.setCondenserSpecsId(ts.getCondenserSpecs() != null ? ts.getCondenserSpecs().getId() : null);
                 m.setEvaporatorSpecsId(ts.getEvaporatorSpecs() != null ? ts.getEvaporatorSpecs().getId() : null);
@@ -683,29 +674,22 @@ public class UnitAppService {
         unit.setMaxAmbient(d.getMaxAmbient());
     }
 
-    // A unit's compressor can be selected either as an imported Frascold rating (model + refrigerant,
-    // the new AW flow) or as a legacy CompressorSpecs. At least one must be present.
-    private void applyCompressorSelection(TechSpecs ts, Long compressorSpecsId, Long compressorRatingId) {
-        ts.setCompressorRating(compressorRatingId == null ? null :
-                compressorRatingRepository.findById(compressorRatingId)
-                        .orElseThrow(() -> new CompressorSpecsDoesntExistException("Selected compressor model doesn't exist.")));
-        ts.setCompressorSpecs(compressorSpecsId == null ? null :
-                compressorSpecsRepository.findById(compressorSpecsId)
-                        .orElseThrow(() -> new CompressorSpecsDoesntExistException("Selected compressor doesn't exist.")));
-        if (ts.getCompressorRating() == null && ts.getCompressorSpecs() == null) {
-            throw new CompressorSpecsDoesntExistException("A compressor must be selected.");
+    // A unit's compressor is selected as a CompressorRating (compressor + refrigerant coefficient set).
+    private void applyCompressorSelection(TechSpecs ts, Long compressorRatingId) {
+        if (compressorRatingId == null) {
+            throw new CompressorDoesntExistException("A compressor rating must be selected.");
         }
+        ts.setCompressorRating(compressorRatingRepository.findById(compressorRatingId)
+                .orElseThrow(() -> new CompressorDoesntExistException("Selected compressor rating doesn't exist.")));
     }
 
     // Per-mode attributes + the component spec points selected for that mode.
     void applyModeSpecs(TechSpecs ts, UnitTechSpecsDTO d) {
-        ts.setCapacity(d.getCapacity());
-        ts.setMaxCapacity(d.getMaxCapacity());
         ts.setCopErr(d.getCopErr());
         ts.setCondenserRequiredDuty(d.getCondenserRequiredDuty());
         ts.setQuietCondenserRequiredDuty(d.getQuietCondenserRequiredDuty());
 
-        applyCompressorSelection(ts, d.getCompressorSpecsId(), d.getCompressorRatingId());
+        applyCompressorSelection(ts, d.getCompressorRatingId());
         ts.setCondenserSpecs(condenserSpecsRepository.findById(d.getCondenserSpecsId())
                 .orElseThrow(() -> new CondenserSpecsDoesntExistException("Selected condenser doesn't exist.")));
         ts.setEvaporatorSpecs(evaporatorSpecsRepository.findById(d.getEvaporatorSpecsId())
@@ -754,7 +738,7 @@ public class UnitAppService {
         // that already exist so editing the model updates them.
         CompressorRating rating = d.getCompressorRatingId() == null ? null
                 : compressorRatingRepository.findById(d.getCompressorRatingId())
-                        .orElseThrow(() -> new CompressorSpecsDoesntExistException("Selected compressor model doesn't exist."));
+                        .orElseThrow(() -> new CompressorDoesntExistException("Selected compressor rating doesn't exist."));
         unit.setCompressorRating(rating);
         if (unit.getUnitDetails() != null) {
             for (UnitDetails md : unit.getUnitDetails()) {
@@ -764,8 +748,6 @@ public class UnitAppService {
     }
 
     void applyModeSpecs(TechSpecs ts, UnitModeSpecsDTO d) {
-        ts.setCapacity(d.getCapacity());
-        ts.setMaxCapacity(d.getMaxCapacity());
         ts.setCopErr(d.getCopErr());
         ts.setCondenserRequiredDuty(d.getCondenserRequiredDuty());
         ts.setQuietCondenserRequiredDuty(d.getQuietCondenserRequiredDuty());

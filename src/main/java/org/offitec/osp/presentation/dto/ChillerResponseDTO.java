@@ -27,10 +27,8 @@ public class ChillerResponseDTO {
 
     // Technical specifications. Component selections are exposed as their *specs* ids
     // so the frontend can preselect the matching dropdown option.
-    private double capacity;
-    private double maxCapacity;
-    private Long compressorSpecsId;
-    // Imported Frascold rating (model + refrigerant) the unit is assigned to, for the new picker.
+    // Compressor rating (compressor + refrigerant coefficient set) the unit is assigned to.
+    // Per-mode capacity now lives on the rating's mode-capacities, not the unit.
     private Long compressorRatingId;
     private int compressorQty;
     private Long condenserSpecsId;

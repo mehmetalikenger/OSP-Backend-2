@@ -17,12 +17,8 @@ public class TechSpecs {
     private Long id;
 
     // --- Per-mode technical attributes (differ between cooling and heating) ---
-
-    private double capacity;
-
-    // Nullable so rows created before this column existed (NULL) still hydrate.
-    @Column(name = "max_capacity")
-    private Double maxCapacity;
+    // Capacity/maxCapacity moved to CompressorRating.modeCapacities (per mode). A unit-mode's
+    // capacity is the rating's CompressorModeCapacity whose mod == UnitDetails.mod.
 
     @Column(name = "cop_err")
     private double copErr;
@@ -33,13 +29,8 @@ public class TechSpecs {
     @Column(name = "quiet_condenser_required_duty")
     private double quietCondenserRequiredDuty;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "compressor_specs_id")
-    private CompressorSpecs compressorSpecs;
-
-    // Link to the imported Frascold rating (model + refrigerant). When set, the calculation uses
-    // the faithful CompressorPerformanceEngine; otherwise it falls back to the legacy CompressorSpecs
-    // polynomial. Nullable so existing units (and the old admin flow) keep working.
+    // Link to the compressor rating (compressor + refrigerant coefficient set). All calculation
+    // goes through the faithful CompressorPerformanceEngine (Frascold cycle or Copeland polynomial).
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "compressor_rating_id")
     private CompressorRating compressorRating;

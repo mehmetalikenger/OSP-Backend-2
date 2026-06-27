@@ -58,7 +58,7 @@ public class EngineCalcRunner implements CommandLineRunner {
                 ? new CompressorPerformanceEngine.SuctionGasTemp(tsuc)
                 : new CompressorPerformanceEngine.Superheat(sh != null ? sh : 10.0);
 
-        Result res = engine.compute(new Input(r, fluid, tk, te, tc, suction, sc, hz, null));
+        Result res = engine.compute(new Input(r, fluid, tk, te, tc, suction, sc, hz, null, null));
 
         log.info("================ ENGINE CALC ================");
         log.info("compressor : {}  ({}, fluid={}, ohRef={}, scRef={}, maxFreq={})",

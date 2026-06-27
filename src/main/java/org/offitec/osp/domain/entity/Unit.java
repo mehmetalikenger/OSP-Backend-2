@@ -54,9 +54,8 @@ public class Unit {
     @Column(name = "expansion_valve_qty")
     private int expansionValveQty;
 
-    // Refrigerant moved to the Compressor (it is a property of the compressor); a unit's
-    // refrigerant is derived from its compressor via UnitDetails -> TechSpecs ->
-    // CompressorSpecs -> Compressor -> Refrigerant.
+    // A unit's refrigerant is derived from its compressor rating via
+    // UnitDetails -> TechSpecs -> CompressorRating -> Refrigerant.
 
     // Chassis is a unit-level selection (shared across all modes).
     @ManyToOne(fetch = FetchType.LAZY)
